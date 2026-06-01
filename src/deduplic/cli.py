@@ -30,8 +30,8 @@ def main():
 
     args = parser.parse_args()
 
-    all_records = normalize_input(args)
-    
+    all_records = normalize_input(args.input)
+
     print(f"Total records loaded: {len(all_records)}")
 
     cleaned_records = deduplicate(all_records, args.keys)

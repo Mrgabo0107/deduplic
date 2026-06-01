@@ -1,10 +1,26 @@
-# Generic Text Deduplicator Library
+# Deduplic
 
-A lightweight, framework-agnostic Python library designed to identify and remove duplicate text records from JSON data based on user-defined keys. It includes a built-in Streamlit interface for quick prototyping and visual data inspection.
+A lightweight, robust, and framework-agnostic Python library and CLI tool designed to identify and remove duplicate records from JSON data based on user-defined keys. 
 
-## Features
+It features an intelligent, fault-tolerant input adapter that handles multiple data formats seamlessly and includes a built-in Streamlit GUI for interactive data inspection.
 
-- **Agnostic & Reusable:** Works with any JSON data structure, completely independent of specific data pipelines.
-- **Dynamic Key Selection:** Choose one or multiple JSON keys (e.g., `title`, `author`, `content`) to establish the duplication criteria.
-- **Batch Processing:** Handles multiple JSON objects or files simultaneously, scaling efficiently.
-<!-- - **Streamlit Web UI:** A simple, interactive dashboard to upload files, select keys, and download deduplicated results. -->
+---
+
+## ✨ Features
+
+- **Agnostic & Reusable:** Works with any JSON data structure, completely independent of specific backend pipelines.
+- **Smart Input Adapter:** Accepts a mix of file paths (`str` or `Path`), pure Python dictionaries, numerical indexed dictionaries (`{"0": {...}, "1": {...}}`), or lists of these formats.
+- **Fault-Tolerant Ingestion:** Gracefully skips corrupt records or invalid formats using non-blocking system warnings instead of crashing.
+- **Dynamic Key Selection:** Choose one or multiple keys (e.g., `title`, `author`) to define the exact deduplication criteria.
+- **Dual-Interface:** Use it as a Python module inside larger software architectures or as a native terminal command (CLI).
+- **Streamlit Web UI:** Includes a beautiful dashboard to upload, analyze, and download deduplicated results visually.
+
+---
+
+## 🚀 Installation
+
+You can install the library directly into your project's virtual environment using any of the following private/local methods:
+
+### 1. From a local folder (Development Mode)
+```bash
+pip install -e .

@@ -1,35 +1,9 @@
 import argparse
 import json
-import sys
 from pathlib import Path
-from core import deduplicate
+from deduplic.core import deduplicate
+from deduplic.input_adapter import normalize_input
 
-def validate_and_load_json(file_path: str) -> list[dict]:
-    """Checks if the file exists and normalizes it into a list of dictionaries."""
-    path = Path(file_path)
-    if not path.exists():
-        print(f"Error: The file '{file_path}' does not exist.", file=sys.stderr)
-        sys.exit(1)
-        
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
-            # if it's a list pass
-            if isinstance(data, list):
-                return data
-                
-            # if it's a dictionary set into a list
-            elif isinstance(data, dict):
-                return [data]
-                
-            else:
-                print(f"Error: '{file_path}' has an invalid format.", file=sys.stderr)
-                sys.exit(1)
-                
-    except json.JSONDecodeError as e:
-        print(f"Error: '{file_path}' is not a valid JSON file. Details: {e}", file=sys.stderr)
-        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(
@@ -56,11 +30,8 @@ def main():
 
     args = parser.parse_args()
 
-    all_records = []
-    for file_path in args.input:
-        records = validate_and_load_json(file_path)
-        all_records.extend(records)
-        
+    all_records = normalize_input(args)
+    
     print(f"Total records loaded: {len(all_records)}")
 
     cleaned_records = deduplicate(all_records, args.keys)

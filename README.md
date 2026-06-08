@@ -17,6 +17,16 @@ It features an intelligent, fault-tolerant input adapter that handles multiple d
 
 ---
 
+el algoritmo de similaridad trabaja con un porcentaje llamado tolerance que servira para definir que tanto se parece un texto a otro en diferentes filtros. 
+
+ - Si el ratio de la longitud entre los dos textos es menor que la tolerancia se dira que los textos son diferentes, esto quiere decir que si a un texto se le anade informacion se considerara que es diferetne del original en cuanto ka informacion anadida sobrepase (1 - t) donde t es la tolerancia. Por ejemplo con una tolerancia de 
+
+el algoritmo usa TI IDF y similaridad por coseno, este metodo sirve para encontrar y comparar conjuntos de palabras claves lo cual sirve como prueba de contexto sobre el ratio de palabras claves encontradas en el contexto
+
+Se espera que diferencias entre contenidos impliquen 
+
+
+
 ## 🚀 Installation
 
 You can install the library directly into your project's virtual environment using any of the following private/local methods:

@@ -1,0 +1,41 @@
+ gerer les doublons
+ 
+ mode:
+ keep all
+ keep first
+ keep longet
+ keep shortest
+ merge / manual (dejar lsito para europarser) [cli, interfaz & code]
+
+
+europarser solo necesita el identificador y debe
+poder tomar la opcion manual por codigo y poder usarla para
+automatizar el merge
+
+
+road map:
+
+asumiendo que el parsing esta listo y sabiendoq eu ya entiendo lo qeu hace
+scikitlearn
+
+1 return de deduplic:
+    deduplic es la funcion principal, debera cumplir varias funciones:
+        - usar scikitlearn para crear la matrices de similaridad de cada key
+        - definir criterios para crear clases de similaridad desde que existan
+            duplicados y retornar los indices que componen cada clase
+        - funciones para reportar estas clases
+        - funcion que por cada clase pregunte que decision tomar:
+             keep all
+             keep first
+             keep longet
+             keep shortest
+             merge / manual (dejar lsito para europarser) [cli, interfaz & code]
+        -retornar la lista orig keep all
+ keep first
+ keep longet
+ keep shortest
+ merge / manual (dejar lsito para europarser) [cli, interfaz & code]inal pasada por parametro con
+            Las modificiaciones hechas
+
+
+

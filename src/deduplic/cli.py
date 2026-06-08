@@ -35,15 +35,16 @@ def main():
     print(f"Total records loaded: {len(all_records)}")
 
     cleaned_records = deduplicate(all_records, args.keys)
+    print(cleaned_records)
     
-    removed_count = len(all_records) - len(cleaned_records)
-    print(f"Deduplication complete. Removed {removed_count} duplicates.")
-    print(f"Remaining unique records: {len(cleaned_records)}")
+    # removed_count = len(all_records) - len(cleaned_records)
+    # print(f"Deduplication complete. Removed {removed_count} duplicates.")
+    # print(f"Remaining unique records: {len(cleaned_records)}")
 
-    output_path = Path(args.output)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(cleaned_records, f, indent=4, ensure_ascii=False)
-    print(f"Cleaned data successfully saved to: {args.output}")
+    # output_path = Path(args.output)
+    # with open(output_path, 'w', encoding='utf-8') as f:
+    #     json.dump(cleaned_records, f, indent=4, ensure_ascii=False)
+    # print(f"Cleaned data successfully saved to: {args.output}")
 
 if __name__ == "__main__":
     main()

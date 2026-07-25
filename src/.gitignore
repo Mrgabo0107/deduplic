@@ -8,7 +8,7 @@ __pycache__/
 pip-wheel-metadata/
 
 test/
-
 build/
-real_data/
+data*/
 dist/
+projects/

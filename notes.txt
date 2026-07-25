@@ -1,41 +1,107 @@
- gerer les doublons
- 
- mode:
- keep all
- keep first
- keep longet
- keep shortest
- merge / manual (dejar lsito para europarser) [cli, interfaz & code]
-
-
 europarser solo necesita el identificador y debe
 poder tomar la opcion manual por codigo y poder usarla para
 automatizar el merge
 
 
-road map:
-
-asumiendo que el parsing esta listo y sabiendoq eu ya entiendo lo qeu hace
-scikitlearn
-
-1 return de deduplic:
-    deduplic es la funcion principal, debera cumplir varias funciones:
-        - usar scikitlearn para crear la matrices de similaridad de cada key
-        - definir criterios para crear clases de similaridad desde que existan
-            duplicados y retornar los indices que componen cada clase
-        - funciones para reportar estas clases
-        - funcion que por cada clase pregunte que decision tomar:
-             keep all
-             keep first
-             keep longet
-             keep shortest
-             merge / manual (dejar lsito para europarser) [cli, interfaz & code]
-        -retornar la lista orig keep all
- keep first
- keep longet
- keep shortest
- merge / manual (dejar lsito para europarser) [cli, interfaz & code]inal pasada por parametro con
-            Las modificiaciones hechas
+curva ROC: https://es.wikipedia.org/wiki/Curva_ROC
+presition and recall: https://en.wikipedia.org/wiki/Precision_and_recall
 
 
+brainstorming:
+
+en la gui hay qeu mirar qeu pasa si un cluster o proyecto no ha termiando de desduplicarse dejar keep all por defecto poero dar la 
+oportunidad de termianr de desduplicar un cluster por metodos no merge
+
+
+quizas deberia crear un tercer boton que forzara un metodo para todas las conexionse sea por cluster con deduplic_cluster o sea por corpus con el boton deduplic general
+
+
+
+
+
+
+debera crearse un .env para controlar entre otras cosas DEFAULT_THERESHOLD
+
+debera testearse como libreria crear test unitarios dado qeu si sirve como libreria sirve en genral
+
+
+
+    organizar con init_from_file exponer init e init from file y documentar dn cmd init deduplic
+
+
+
+merge brainstorming:
+
+dado qeu la funcion deduplic_connectiosn luce asi:
+
+def deduplic_connection(project_path: Path, cluster_idx: int, edge_idx: int, method: str = "keep_all"):
+    corpus, report = _load_draft(project_path)
+    
+    try:
+        corpus, report = _process_edge(corpus, report, cluster_idx, edge_idx, method, project_path)
+    except Exception as e:
+        print(f"Error: {e}")
+    
+    _save_draft(project_path, corpus, report)
+
+he llegado a la conclusion de que el metodo merge si o si necesita una decision humana en algun punto asi que lo 
+separare en dos pasos:
+
+paso 1 creacion de formulario o preview no se como llamarlo bien:
+deduplic_connections con el metodo merge retornara el corpus y el report sin cambios
+en su lugar creara si no existe una carpeta "merges" en el proyecto y dentro creara un archivo merege_<idx_nado_a>_<idx_nodo_b> que tendra varias funciones:
+
+sera un .json que tendra las siguientes keys: preview (o como sea la mejor forma de llamar a esto), decision y status
+    key "preview": es un json dinamico que tiene implicitas todas las cosas que podrian entrar al merge. un ejemplo luce asi:
+    
+    {
+        "title":  {"keep": True, "source": "a", "edit": None},
+        "author": {"keep": True, "source": "b", "edit": None},
+        "notes":  {"keep": True, "source": "b", "edit": "texto editado a mano"},
+        "isbn":   {"keep": False}
+    }
+    con a y b los indices de los registros.
+
+    La idea es que este se inicialice con todas las keep en false y tanto las sources como las edit en None. A traves de un proceso
+    de decision que detallare a lo largo de este texto en el merge se guardaran las keys que tengan keep true, no permitira
+    que se cree un merge si ningun keep es true, no permitira que un merge se haga si alguna key con keep true tiene source None
+    si una key existe en el record a y no en b esta estara disponible para keep true y si por error el usuario marca que la source 
+    es el record donde no existe la key se llenara automaticamente con el contenido del record qeu si tiene la key asi siempre que se
+    escoja una key esta no quedara vacia a menos que el registro tenga contenido vacio en esa key en cuyo caso no es el problema de deduplic
+    si edit no es None se insertara el texto del edit como conentindo de la key en el merge. (en lagui se controlara que esto se haga proponiendo
+    editar el contendio del record asi se ayuida al usuario a no perder conmtexto)
+
+
+paso 2: pedir la decision humana
+    key "decision": se inicializa a None 
+    Aca puede haber lo qeu sea en teoria, se proporcionara a cada frontend una funcion que permita redactar interactivamente una desision bien setteada
+    esta funcion creara algo asi (tu me diras si hay una forma mejor)
+
+    {
+        "chosen_keys" : ["title", "author"], source : [a, b], edit : [None, <si esto es una string se convierte en el contenido asignado a la key author>]
+    }
+
+    aca no veo como unificar esta funcion para ser template de cualquier forntend ya lo discutriemos, en todo caso si las llaves que entran hacen parte de
+    las disponibles sin que entre una llave rara esta bien, qeu los indices de source sean si o si de uno o el otro y pues ya el frontend se responsabilizara
+    de controlar qeu entra en edit para asegurar coherencia,
+
+    por ultimo una funcion debe validar el archivo y si todo es OK coloca status en true, y asi el merge esta validado debera haber una funcion que se llame:
+    deduplic_execute_merge <aca creoq eu debere pasar los dos indices de la conexion> la idea es qeu esta funcion debera poder rastrear un merge en particular y si su estatus es true 
+    ejecutar el merge en un sintetic_record y de resto todo es analogo a lso otros metodos.
+
+    La unica posible falla que he visto es que al hacer un merge los registros que van quedando deprecated se fusionan en nodos del draft qeu estan al final
+    entonces los merges siguientes no pueden operar con los nodos deprecated tienen que rastrear el ultimo merge hecho que ha alimentado el indice que termina
+    originalmente el merge, en muchos casos tanto a como b abran sido absorbidos por el mismo nodo merge y en ese caso simplemente se hace un pass. el riesgo
+    es grande no se peude aplicar ningun metodo si un merge existe en carpeta merges, se deben bloquear todos los metodos puies no veo claro si la estrategia de restrear el
+    nodo merge ultimo funcione aun si otro metodo ha sido usado creo que podria dar resultados inesperados y en general destructivos pero es un buen debate 
+    no sesi pueda ser interesante dejar qeu otros meotods actuen y luego ahcer merges rastreango el nodo final pues al fin y al cabo los metodos son un caso particular del merge
+    asumo qeu en teoria los metodos son en si un caso particular de merge automatizado asi qeu sio deberia funcionar el problema seria de coherencia 
+    teorica un nodo logrado con metodos diversos quizas no busque un merge pero puede qeu si quien sabe que necesitara el qeu use esto.
+
+lo anterior es previendo qeu la funcion deduplic cluster y all vana  pasar con el metodo merge por todo el cluster o proyecto esto isnpira el hecho de qeu sea necesario
+enunciarel merge y gestionarloordenadamente despues francamente segun la discucion del ultimo parrafo siento que el unico dilema es si dejo que le ususario resuelva 
+los merges cuando quiera o inmediatamente despues de correr algun _process_edge  con metodo merge lo unico que si se es que el commit no se podra realizar mientras
+merges no este vacia. para eso debera existir tambien una funcion forget_merges que simplemente los borrra de la caroeta y permite el commit 
+
+Se me escapa algo?
 

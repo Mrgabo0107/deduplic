@@ -11,7 +11,7 @@ def deduplic_init(
     keys: list,
     name: str = None,
     threshold: float = 0.8,
-) -> Path:
+) -> Path | None:
     """
     Normalizes the input, creates an incremental workspace under projects/,
     generates the raw report, and returns the absolute path to the project folder.
@@ -20,11 +20,22 @@ def deduplic_init(
     # 1. Normalize the raw input using the input adapter
     normalized_records = normalize_input(raw_input)
 
-    # 2. Create the 'projects' directory if it does not exist
+    # 2. Generate the pure report directly from in-memory normalized records
+    report_data = do_reports(
+        data=normalized_records,
+        keys_to_check=keys,
+        threshold=threshold,
+    )
+
+    if not report_data:
+        print(f"No duplications found in the corpus with threshold {threshold}. Project creation aborted.")
+        return None
+
+    # 3. Create the 'projects' directory if it does not exist
     projects_root = Path("projects").resolve()
     projects_root.mkdir(parents=True, exist_ok=True)
 
-    # 3. Determine the project folder name (auto-increment)
+    # 4. Determine the project folder name (auto-increment)
     if name is None:
         counter = 1
         while (projects_root / str(counter)).exists():
@@ -43,7 +54,7 @@ def deduplic_init(
     path_original = project_path / "original"
     path_original.mkdir(parents=True, exist_ok=True)
 
-    # 4. Save the normalized corpus as corpus.json ("Boite" format)
+    # 5. Save the normalized corpus as corpus.json ("Boite" format)
     corpus_boite = {
         str(i): record
         for i, record in enumerate(normalized_records)
@@ -59,14 +70,6 @@ def deduplic_init(
             ensure_ascii=False,
         )
 
-    # 5. Generate the pure report directly from in-memory normalized records
-    report_data = do_reports(
-        data=normalized_records,
-        keys_to_check=keys,
-        threshold=threshold,
-    )
-
-
     report_file = path_original / "report.json"
 
     with open(report_file, "w", encoding="utf-8") as f:
@@ -80,7 +83,8 @@ def deduplic_init(
     metadata = {
         "threshold": threshold,
         "keys_checked": keys,
-        "total_records": len(normalized_records)
+        "total_records": len(normalized_records),
+        "status": "in progress"
     }
     
     metadata_file = project_path / "metadata.json"
@@ -187,6 +191,9 @@ def main():
         name=args.project_name,
         threshold=args.threshold,
     )
+
+    if created_folder is None:
+        return
 
     # Set original as current state and create draft directory
     init_workspace(created_folder)

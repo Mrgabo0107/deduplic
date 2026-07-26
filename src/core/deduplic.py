@@ -192,6 +192,17 @@ def commit(project_path: Path) -> None:
             f"No draft (.draft) found to commit in {project_path}."
         )
     shutil.rmtree(draft_dir)
+
+    metadata_file = project_path / "metadata.json"
+    if metadata_file.exists():
+        with open(metadata_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        
+        metadata["status"] = "committed"
+        
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=4, ensure_ascii=False)
+
     print(f"-> Changes successfully committed to {project_path.name}.")
 
 

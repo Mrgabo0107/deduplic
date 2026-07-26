@@ -1,10 +1,9 @@
 import streamlit as st
-from components.sidebar import render_sidebar
-from components.workspace import render_workspace
+from streamlit_gui.components.sidebar import render_sidebar
+from streamlit_gui.components.workspace import render_workspace
 
 st.set_page_config(
-    page_title="Deduplicator Studio",
-    page_icon="⚡",
+    page_icon="🖇️",
     layout="wide"
 )
 

@@ -1,20 +1,24 @@
 import streamlit as st
-from utils.project_loader import load_project_report, load_dedup_corpus
+from streamlit_gui.utils.project_loader import load_project_report, load_dedup_corpus
 
 
 def render_workspace(project_name: str | None, status: str | None):
     """Renderiza el área de trabajo principal según el proyecto activo."""
-    st.title("Deduplicator Workspace")
 
     if not project_name:
         st.info("Select a project from the sidebar to get started.")
         return
 
-    st.subheader(f"Active project: `{project_name}`")
 
     # CASO 1: Committed
     if status == "committed":
-        st.success("Project committed")
+        st.markdown(
+            f"""
+            <span style="font-size: 45px; font-weight: bold;"> {project_name}:</span> 
+            <span style="font-size: 30px; color: gray;">🟢 Committed</span>
+            """,
+            unsafe_allow_html=True
+        )
         dedup_data = load_dedup_corpus(project_name)
 
         if dedup_data is not None:
@@ -25,7 +29,13 @@ def render_workspace(project_name: str | None, status: str | None):
 
     # CASO 2: In Progress
     else:
-        st.info("🟡 Project in progress")
+        st.markdown(
+            f"""
+            <span style="font-size: 45px; font-weight: bold;"> {project_name}:</span> 
+            <span style="font-size: 30px; color: gray;">🟡 Project in progress</span>
+            """,
+            unsafe_allow_html=True
+        )
         report_data = load_project_report(project_name)
 
         if report_data is not None:

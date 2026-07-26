@@ -1,5 +1,5 @@
 import streamlit as st
-from utils.project_loader import get_projects_info
+from streamlit_gui.utils.project_loader import get_projects_info
 
 
 def render_sidebar() -> tuple[str | None, str | None]:

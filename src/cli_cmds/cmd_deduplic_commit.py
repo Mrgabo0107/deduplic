@@ -39,10 +39,6 @@ def main():
     # Execute the commit operation
     try:
         commit(project_path)
-        print(
-            f"Commit completed successfully for '{project_path.name}'. "
-            "Changes have been consolidated."
-        )
     except Exception as e:
         print(f"Error during consolidation (commit): {e}")
 

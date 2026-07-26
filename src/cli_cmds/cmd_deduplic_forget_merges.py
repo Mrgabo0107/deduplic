@@ -2,32 +2,40 @@ import argparse
 from pathlib import Path
 from core.merge_manager import forget_merges
 
+PROJECTS_DIR = Path(__file__).resolve().parents[2] / "projects"
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Elimina todos los borradores de merge pendientes en la carpeta 'merges/'."
+        description="Deletes all pending merge drafts from the project's 'merges/' directory."
     )
     parser.add_argument(
-        "project_path",
-        type=Path,
-        help="Ruta al directorio del proyecto."
+        "project_name",
+        type=str,
+        help="Name of the project located inside the 'projects/' directory."
     )
-    parser.add_argument(
-        "--confirm",
-        action="store_true",
-        help="Confirmación explícita requerida para eliminar la carpeta merges/."
-    )
+    # parser.add_argument(
+    #     "--confirm",
+    #     action="store_true",
+    #     help="Explicit confirmation required to delete the 'merges/' directory."
+    # )
 
     args = parser.parse_args()
 
-    if not args.confirm:
-        print("Error: Operación cancelada. Debe incluir la bandera '--confirm' para descartar los merges pendientes.")
+    # if not args.confirm:
+    #     print("Error: Operation canceled. You must include the '--confirm' flag to discard all pending merge drafts.")
+    #     return
+
+    project_path = PROJECTS_DIR / args.project_name
+
+    if not project_path.exists():
+        print(f"Error: Project directory '{project_path}' does not exist.")
         return
 
     try:
-        forget_merges(args.project_path, confirm=True)
+        forget_merges(project_path, confirm=True)
     except Exception as e:
-        print(f"Error al descartar los merges: {e}")
+        print(f"Error while discarding merge drafts: {e}")
 
 
 if __name__ == "__main__":

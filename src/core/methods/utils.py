@@ -171,3 +171,13 @@ def resolve_active_node(corpus: dict, node_id: str) -> str:
         current = str(next_node)
 
     return current
+
+def load_comparison_keys_from_project(project_path: Path) -> list[str]:
+    """Loads the comparison keys defined in the project's metadata."""
+    metadata_file = project_path / "metadata.json"  # or config.json, depending on your project structure
+    if metadata_file.exists():
+        with open(metadata_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+            # Returns the list stored during the initialization/blocking phase
+            return metadata.get("keys_checked", [])
+    return []

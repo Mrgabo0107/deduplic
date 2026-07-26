@@ -66,6 +66,7 @@ def deduplic_init(
         threshold=threshold,
     )
 
+
     report_file = path_original / "report.json"
 
     with open(report_file, "w", encoding="utf-8") as f:
@@ -173,7 +174,6 @@ def _parser():
 
 def main():
     args = _parser()
-
     # Load the JSON corpus passed through the CLI
     corpus_path = Path(args.path_to_corpus).resolve()
 

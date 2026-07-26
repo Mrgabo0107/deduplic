@@ -40,7 +40,6 @@ def main():
     # Execute the restore operation
     try:
         restore(project_path)
-        print(f"Restore completed successfully for '{project_path.name}'.")
     except Exception as e:
         print(f"Error during restore: {e}")
 

@@ -104,6 +104,12 @@ def deduplic_cluster(project_path: Path, cluster_idx: int, method: str = "keep_a
         return
     save_draft(project_path, corpus, report)
 
+def deduplic_cluster_by_comp_id(project_path: Path, id_to_find: int, method: str = "keep_all"):
+    _, report = load_draft(project_path)
+    
+    for cluster_idx, cluster in enumerate(report):
+        if cluster.get("component_id") == id_to_find:
+            deduplic_cluster(project_path, cluster_idx, method)
 
 
 def deduplic_all(project_path: Path, method: str = "keep_all"):
@@ -153,7 +159,7 @@ def get_state(project_path: Path) -> Path:
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(clean_corpus, f, indent=4, ensure_ascii=False)
 
-    print(f"-> Screenshot successfully generated: '{output_file.name}'")
+    print(f"-> snapshot successfully generated: '{output_file.name}'")
     return output_file
 
 
@@ -169,17 +175,22 @@ def commit(project_path: Path) -> None:
             "Resolve them by running 'deduplic_execute_merge' or discard them with 'forget_merges'."
         )
 
+    get_state(project_path)
+
+
+    root_report_file = project_path / "report.json"
+    if root_report_file.exists():
+        root_report_file.unlink()
+
+    root_original_corp_file = project_path / "corpus.json"
+    if root_original_corp_file.exists():
+        root_original_corp_file.unlink()
+
     draft_dir = project_path / ".draft"
     if not draft_dir.exists():
         raise FileNotFoundError(
             f"No draft (.draft) found to commit in {project_path}."
         )
-
-    # Copy corpus and report to the project root
-    shutil.copy(draft_dir / "corpus.json", project_path / "corpus.json")
-    shutil.copy(draft_dir / "report.json", project_path / "report.json")
-
-    # Clean up the draft directory
     shutil.rmtree(draft_dir)
     print(f"-> Changes successfully committed to {project_path.name}.")
 

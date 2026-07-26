@@ -3,24 +3,32 @@ import json
 from pathlib import Path
 from core.merge_manager import list_pending_merges
 
+PROJECTS_DIR = Path(__file__).resolve().parents[2] / "projects"
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Lista todos los borradores de merge pendientes con su estado dinámico recalculado."
+        description="Lists all pending merge drafts with their dynamically recomputed status."
     )
     parser.add_argument(
-        "project_path",
-        type=Path,
-        help="Ruta al directorio del proyecto."
+        "project_name",
+        type=str,
+        help="Name of the project located inside the 'projects/' directory."
     )
 
     args = parser.parse_args()
 
+    project_path = PROJECTS_DIR / args.project_name
+
+    if not project_path.exists():
+        print(f"Error: Project directory '{project_path}' does not exist.")
+        return
+
     try:
-        pending = list_pending_merges(args.project_path)
+        pending = list_pending_merges(project_path)
         print(json.dumps(pending, indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"Error al listar los merges: {e}")
+        print(f"Error listing merge drafts: {e}")
 
 
 if __name__ == "__main__":

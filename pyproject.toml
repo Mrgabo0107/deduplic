@@ -34,6 +34,7 @@ dev = [
 deduplic_init = "cli_cmds.cmd_deduplic_init:main"
 deduplic_connection = "cli_cmds.cmd_deduplic_connection:main"
 deduplic_cluster = "cli_cmds.cmd_deduplic_cluster:main"
+deduplic_cluster_by_id = "cli_cmds.cmd_deduplic_cluster_by_id:main"
 deduplic_all = "cli_cmds.cmd_deduplic_all:main"
 deduplic_commit = "cli_cmds.cmd_deduplic_commit:main"
 deduplic_get_state = "cli_cmds.cmd_deduplic_get_state:main"

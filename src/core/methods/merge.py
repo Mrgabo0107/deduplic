@@ -5,7 +5,8 @@ from .utils import (
     collect_neighbors_and_untouched_edges,
     recompute_edges_for_synthetic_node,
     update_cluster_structure,
-    resolve_active_node
+    resolve_active_node,
+    load_comparison_keys_from_project
 )
 
 
@@ -95,14 +96,16 @@ def apply_merge_decision(
         val = None
 
         # Automatic fallback if the selected source does not contain the key
-        if source == "a":
+        if source == node_a_id:
             val = rec_a.get(key)
             if val is None:
                 val = rec_b.get(key)
-        elif source == "b":
+        elif source == node_b_id:
             val = rec_b.get(key)
             if val is None:
                 val = rec_a.get(key)
+        else:
+            raise ValueError(f"error: for key: {key} invalid source \"{source}\"")
 
         synthetic_record[key] = val
 
@@ -123,7 +126,7 @@ def apply_merge_decision(
     edges = cluster.get("edges_trazability", [])
 
     threshold = load_threshold_from_project(project_path) if project_path else 0.8
-    keys_for_similarity = [k for k in synthetic_record.keys() if not k.startswith("_")]
+    keys_for_similarity = load_comparison_keys_from_project(project_path)
 
     neighbor_ids, untouched_edges = collect_neighbors_and_untouched_edges(
         edges,

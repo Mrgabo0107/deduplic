@@ -6,7 +6,6 @@ from core.deduplic import get_state
 def main():
     if len(sys.argv) < 2:
         print("Error: Project name is required.")
-        print("Usage: python cmd_deduplic_screenshot.py <project_name>")
         sys.exit(1)
 
     project_name = sys.argv[1]
@@ -21,10 +20,9 @@ def main():
 
     try:
         output_file = get_state(project_path)
-        print(f"\n[SUCCESS] Snapshot created successfully for project '{project_name}'.")
         print(f"Output saved at: {output_file.resolve()}")
     except Exception as e:
-        print(f"\n[ERROR] Failed to create screenshot for project '{project_name}': {e}")
+        print(f"\nerror: Failed to create snapshot for project '{project_name}': {e}")
         sys.exit(1)
 
 

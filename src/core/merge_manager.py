@@ -118,7 +118,6 @@ def execute_merge(project_path: Path, node_a_id: int, node_b_id: int) -> str:
         final_a = resolve_active_node(corpus, merge_data["node_a_id"])
         final_b = resolve_active_node(corpus, merge_data["node_b_id"])
         new_edge_idx = _find_edge_idx_for_pair(report, merge_data["cluster_idx"], final_a, final_b)
-        print(f" despues {new_edge_idx}")
         if new_edge_idx is None:
             # el motor de similitud ya no conecta a estos nodos finales: nada que revisar
             file_path.unlink()
@@ -151,7 +150,7 @@ def execute_merge(project_path: Path, node_a_id: int, node_b_id: int) -> str:
         print(
             f"-> Merge is stale. "
             f"Preview regenerated as {new_file_path.name} for active nodes "
-            f"{fresh['node_a_id']} and {fresh['node_b_id']}."
+            f"{node_a_id} and {node_b_id}."
         )
         return "needs_review"
 

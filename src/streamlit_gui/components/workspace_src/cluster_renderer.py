@@ -1,12 +1,45 @@
 import streamlit as st
-from src.streamlit_gui.components.workspace_src.corpus_loader import AVAILABLE_METHODS, EXCLUDED_METHODS
+from src.streamlit_gui.components.workspace_src.corpus_loader import (
+    AVAILABLE_METHODS,
+    EXCLUDED_METHODS,
+)
+from src.streamlit_gui.services.dedup_service import (
+    resolve_edge_action,
+    resolve_cluster_action,
+)
+
+
+def _on_resolve_edge(project_name: str, component_id: int | str, edge_idx: int, method_key: str):
+    """Callback que captura la opción seleccionada directamente desde st.session_state."""
+    method = st.session_state.get(method_key)
+
+    resolve_edge_action(
+        project_name=project_name,
+        component_id=component_id, # Pass component_id instead of positional index
+        edge_idx=edge_idx,
+        method_name=method,
+    )
+    st.toast("Connection resolved successfully!", icon="✅")
+
+
+def _on_resolve_cluster(project_name: str, component_id: int | str, method_key: str):
+    """Callback para la resolución de cluster completo por ID."""
+    method = st.session_state.get(method_key)
+    
+    resolve_cluster_action(
+        project_name=project_name,
+        component_id=component_id, # Pass component_id instead of positional index
+        method_name=method,
+    )
+    st.toast("Cluster resolved successfully!", icon="✅")
 
 
 def render_connection_explorer(
+    project_name: str,
     component_id: int | str,
     c_idx: int,
     edges: list,
-    corpus_lookup: dict
+    corpus_lookup: dict,
 ):
     """Renderiza el explorador lateral/detallado de conexiones dentro de un cluster."""
 
@@ -28,7 +61,7 @@ def render_connection_explorer(
                 min_value=1,
                 max_value=max_e_pages,
                 value=1,
-                key=f"e_page_{component_id}_{c_idx}"
+                key=f"e_page_{component_id}_{c_idx}",
             )
             e_start = (e_page - 1) * MAX_EDGES_PER_PAGE
             e_end = min(e_page * MAX_EDGES_PER_PAGE, total_edges)
@@ -42,7 +75,10 @@ def render_connection_explorer(
             current_edges = edges
 
         edge_options = {
-            f"🔹 `{e.get('pair', ['?','?'])[0]}` ↔ `{e.get('pair', ['?','?'])[1]}`": (e_start + idx, e)
+            f"🔹 `{e.get('pair', ['?','?'])[0]}` ↔ `{e.get('pair', ['?','?'])[1]}`": (
+                e_start + idx,
+                e,
+            )
             for idx, e in enumerate(current_edges)
         }
 
@@ -50,7 +86,7 @@ def render_connection_explorer(
             "Connections list",
             options=list(edge_options.keys()),
             key=f"radio_edge_{component_id}_{c_idx}",
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
 
         e_idx, selected_edge = edge_options[selected_label]
@@ -75,7 +111,10 @@ def render_connection_explorer(
 
         if details:
             st.markdown("**Scores:**")
-            lines = [f"- **{key_name}**: `{score * 100:.1f}%`" for key_name, score in details.items()]
+            lines = [
+                f"- **{key_name}**: `{score * 100:.1f}%`"
+                for key_name, score in details.items()
+            ]
             st.markdown("\n".join(lines))
 
         st.markdown("---")
@@ -94,38 +133,39 @@ def render_connection_explorer(
         st.markdown("##### Resolve connection by method:")
         m_col, b_col = st.columns([3, 1])
 
+        method_key = f"method_edge_{component_id}_{c_idx}_{e_idx}"
+
         with m_col:
             conn_method = st.selectbox(
                 "Method",
                 options=AVAILABLE_METHODS,
-                key=f"method_edge_{component_id}_{c_idx}_{e_idx}",
-                label_visibility="collapsed"
+                key=method_key,
+                label_visibility="collapsed",
             )
-
         with b_col:
-            if st.button(
+            st.button(
                 "Resolve",
-                key=f"btn_edge_{component_id}_{c_idx}_{e_idx}"
-            ):
-                st.toast(
-                    f"Resolved connection {elem_a} <-> {elem_b} using '{conn_method}'.",
-                    icon="✅"
-                )
+                key=f"btn_edge_{component_id}_{c_idx}_{e_idx}",
+                on_click=_on_resolve_edge,
+                args=(project_name, component_id, e_idx, method_key)
+            )
 
 
 def render_component_item(
+    project_name: str,
     component: dict,
     start_idx: int,
     rel_idx: int,
-    corpus_lookup: dict
+    corpus_lookup: dict,
 ):
     """Renderiza un Cluster individual dentro del expansor."""
     c_idx = start_idx + rel_idx
     component_id = component.get("component_id", c_idx)
     nodes = component.get("nodes", [])
     edges = component.get("edges_trazability", [])
-    if not nodes or not edges:
-        pass
+
+    if not nodes and not edges:
+        return
 
     MAX_NODES_TO_SHOW = 6
     nodes_str = ", ".join(map(str, nodes[:MAX_NODES_TO_SHOW]))
@@ -137,26 +177,30 @@ def render_component_item(
     with st.expander(label, expanded=False):
         st.markdown("##### Resolve cluster by method:")
         c1, c2 = st.columns([3, 1])
+        
+        cluster_method_key = f"method_comp_{component_id}_{c_idx}"
+        
         with c1:
             cluster_methods = [
-                m for m in AVAILABLE_METHODS
-                if m not in EXCLUDED_METHODS
+                m for m in AVAILABLE_METHODS if m not in EXCLUDED_METHODS
             ]
             selected_cluster_method = st.selectbox(
-                "Deduplication Method",
+                "Method",
                 options=cluster_methods,
-                key=f"method_comp_{component_id}_{c_idx}",
-                label_visibility="collapsed"
+                key=cluster_method_key,
+                label_visibility="collapsed",
             )
         with c2:
-            if st.button(
+            # ✅ Usamos on_click para la resolución del cluster
+            st.button(
                 "Resolve",
                 key=f"btn_comp_{component_id}_{c_idx}",
-                type="primary"
-            ):
-                st.toast(
-                    f"Resolving Cluster {component_id} using '{selected_cluster_method}'..."
-                )
+                type="primary",
+                on_click=_on_resolve_cluster,
+                args=(project_name, component_id, cluster_method_key)
+            )
 
         st.markdown("---")
-        render_connection_explorer(component_id, c_idx, edges, corpus_lookup)
+        render_connection_explorer(
+            project_name, component_id, c_idx, edges, corpus_lookup
+        )

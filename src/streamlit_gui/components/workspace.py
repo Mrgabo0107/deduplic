@@ -1,8 +1,10 @@
 import streamlit as st
+import json
 from src.streamlit_gui.utils.project_loader import (
     load_project_report,
     load_dedup_corpus,
     get_projects_info,
+    PROJECTS_DIR
 )
 from src.streamlit_gui.components.workspace_src import (
     get_cached_corpus,
@@ -11,6 +13,13 @@ from src.streamlit_gui.components.workspace_src import (
     render_project_global_actions,
 )
 
+
+def get_active_report(project_name: str):
+    draft_report = PROJECTS_DIR / project_name / ".draft" / "report.json"
+    if draft_report.exists():
+        with open(draft_report, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return load_project_report(project_name)
 
 def render_workspace(project_name: str | None):
     """Renders the main workspace based on the active project."""
@@ -53,7 +62,7 @@ def render_workspace(project_name: str | None):
             unsafe_allow_html=True
         )
 
-        clusters = load_project_report(project_name)
+        clusters = get_active_report(project_name)
 
         if clusters is None:
             st.warning("No report file was found for this project.")
@@ -74,7 +83,7 @@ def render_workspace(project_name: str | None):
         corpus_lookup = get_cached_corpus(project_name, mtime)
 
         total_clusters = len(clusters)
-        st.caption(f"Total Pending Components/Clusters: **{total_clusters}**")
+        st.caption(f"Total pending clusters: **{total_clusters}**")
 
         # --- PAGINACIÓN DE CLUSTERS ---
         ITEMS_PER_PAGE = 15
@@ -109,8 +118,17 @@ def render_workspace(project_name: str | None):
         st.markdown("---")
 
         # --- RENDERIZADO DE CLUSTERS ---
+        # for rel_idx, component in enumerate(visible_clusters):
+        #     render_component_item(component, start_idx, rel_idx, corpus_lookup)
+
         for rel_idx, component in enumerate(visible_clusters):
-            render_component_item(component, start_idx, rel_idx, corpus_lookup)
+            render_component_item(
+                project_name,  # <-- Pasa project_name como primer argumento
+                component, 
+                start_idx, 
+                rel_idx, 
+                corpus_lookup
+            )
 
         # --- SECCIÓN GLOBAL INFERIOR ---
         render_project_global_actions(project_name, total_clusters)

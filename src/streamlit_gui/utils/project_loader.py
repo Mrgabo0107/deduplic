@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
+from cli_cmds.cmd_deduplic_init import deduplic_init, init_workspace
 
-# Localizar la carpeta projects/
 PROJECTS_DIR = Path(__file__).resolve().parents[3] / "projects"
 
 
 def get_projects_info() -> dict:
-    """Escanea la carpeta projects/ y lee la metadata de cada proyecto."""
+    """Scans the projects/ directory and reads the metadata for each project."""
     projects = {}
     if PROJECTS_DIR.exists():
         for p in PROJECTS_DIR.iterdir():
@@ -15,8 +15,8 @@ def get_projects_info() -> dict:
                 if meta_file.exists():
                     try:
                         with open(meta_file, "r", encoding="utf-8") as f:
-                            meta = json.load(f)
-                            projects[p.name] = meta.get("status", "unknown")
+                            metadata = json.load(f)
+                            projects[p.name] = metadata.get("status", "unknown")
                     except Exception:
                         projects[p.name] = "error"
                 else:
@@ -25,7 +25,7 @@ def get_projects_info() -> dict:
 
 
 def load_project_report(project_name: str) -> dict | None:
-    """Carga el report.json (priorizando .draft/report.json)."""
+    """Loads report.json, prioritizing .draft/report.json if available."""
     project_path = PROJECTS_DIR / project_name
     draft_report = project_path / ".draft" / "report.json"
     root_report = project_path / "report.json"
@@ -39,9 +39,30 @@ def load_project_report(project_name: str) -> dict | None:
 
 
 def load_dedup_corpus(project_name: str) -> dict | None:
-    """Carga el dedup_corpus.json de un proyecto en estado committed."""
+    """Loads dedup_corpus.json from a committed project."""
     dedup_file = PROJECTS_DIR / project_name / "dedup_corpus.json"
     if dedup_file.exists():
         with open(dedup_file, "r", encoding="utf-8") as f:
             return json.load(f)
     return None
+
+
+def create_new_project_from_upload(uploaded_file, selected_keys: list, threshold: float) -> tuple[Path | None, str]:
+    """Processes the uploaded file and creates a new project using deduplic_init and init_workspace."""
+    raw_data = json.load(uploaded_file)
+
+    # Use the uploaded filename (without extension) as the base project name
+    base_name = Path(uploaded_file.name).stem
+
+    created_path = deduplic_init(
+        raw_input=raw_data,
+        keys=selected_keys,
+        name=base_name,
+        threshold=threshold
+    )
+
+    if created_path is None:
+        return None, base_name
+
+    init_workspace(created_path)
+    return created_path, base_name

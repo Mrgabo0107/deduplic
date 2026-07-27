@@ -42,6 +42,7 @@ deduplic_restore = "cli_cmds.cmd_deduplic_restore:main"
 deduplic_exec_merges = "cli_cmds.cmd_deduplic_exec_merges:main"
 deduplic_forget_merges = "cli_cmds.cmd_deduplic_forget_merges:main"
 deduplic_list_merges = "cli_cmds.cmd_deduplic_list_merges:main"
+deduplic_gui = "cli_cmds.cmd_deduplic_stit_gui:run_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

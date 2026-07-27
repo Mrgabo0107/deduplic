@@ -41,3 +41,5 @@ debera testearse como libreria crear test unitarios dado qeu si sirve como libre
  Comienzo imaginando qeu lo mejor es qeu la gui siempre se peuda desplegar la cual en un inicio debera estar vacia salvo por un menu (que por
  la molestia de no poder custimizar el header de streamlit asumo debera estar en el footer) que permita escoger algun proyecto de la carpeta
  proyects al hacerlo 
+
+ poner una barra de carga para bloquear la app si se esta cargando un json 

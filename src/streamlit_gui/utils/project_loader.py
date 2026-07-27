@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import streamlit as st
 from cli_cmds.cmd_deduplic_init import deduplic_init, init_workspace
 
 PROJECTS_DIR = Path(__file__).resolve().parents[3] / "projects"
@@ -24,18 +25,24 @@ def get_projects_info() -> dict:
     return projects
 
 
-def load_project_report(project_name: str) -> dict | None:
-    """Loads report.json, prioritizing .draft/report.json if available."""
-    project_path = PROJECTS_DIR / project_name
-    draft_report = project_path / ".draft" / "report.json"
-    root_report = project_path / "report.json"
+def load_project_report(project_name: str, force_reload: bool = False) -> dict | None:
+    """Loads report.json into session_state for instant navigation."""
+    key = f"report_data_{project_name}"
+    
+    if force_reload or key not in st.session_state:
+        project_path = PROJECTS_DIR / project_name
+        draft_report = project_path / ".draft" / "report.json"
+        root_report = project_path / "report.json"
 
-    report_file = draft_report if draft_report.exists() else root_report
+        report_file = draft_report if draft_report.exists() else root_report
 
-    if report_file.exists():
-        with open(report_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return None
+        if report_file.exists():
+            with open(report_file, "r", encoding="utf-8") as f:
+                st.session_state[key] = json.load(f)
+        else:
+            st.session_state[key] = None
+
+    return st.session_state[key]
 
 
 def load_dedup_corpus(project_name: str) -> dict | None:
@@ -50,8 +57,6 @@ def load_dedup_corpus(project_name: str) -> dict | None:
 def create_new_project_from_upload(uploaded_file, selected_keys: list, threshold: float) -> tuple[Path | None, str]:
     """Processes the uploaded file and creates a new project using deduplic_init and init_workspace."""
     raw_data = json.load(uploaded_file)
-
-    # Use the uploaded filename (without extension) as the base project name
     base_name = Path(uploaded_file.name).stem
 
     created_path = deduplic_init(

@@ -6,10 +6,9 @@ from core.methods.merge import build_merge_preview, apply_merge_decision
 from core.draft_io import load_draft, save_draft
 
 
-def _merge_filename(node_a_id: int, node_b_id: int) -> str:
+def _merge_filename(component_id: int | str, node_a_id: int, node_b_id: int) -> str:
     lo, hi = sorted((int(node_a_id), int(node_b_id)))
-    return f"merge_{lo}_{hi}.json"
-
+    return f"{component_id}_{lo}_{hi}.json"
 
 def is_decision_complete(fields: dict) -> bool:
     """Checks whether the decision has at least one active field and all active fields are valid."""
@@ -43,18 +42,31 @@ def compute_status(merge_data: dict, corpus: dict) -> str:
     return "draft"
 
 
-def create_pending_merge(project_path: Path, cluster_idx: int, edge_idx: int) -> Path:
-    """Creates a draft .json file inside the project's merges/ directory."""
+
+def create_pending_merge(project_path: Path, cluster_idx: int, edge_idx: int) -> Path | None:
+    """Creates a draft .json file inside the project's merges/ directory if it doesn't already exist."""
     corpus, report = load_draft(project_path)
 
     preview = build_merge_preview(corpus, report, cluster_idx, edge_idx)
     if not preview:
-        print(f"-> Edge {edge_idx} in cluster {cluster_idx} is already a self-merge; skipping.")
         return None
+
+    cluster = report[cluster_idx]
+    component_id = cluster.get("component_id", cluster.get("id", cluster_idx))
+
+    filename = _merge_filename(component_id, preview["node_a_id"], preview["node_b_id"])
     merges_dir = project_path / "merges"
     merges_dir.mkdir(parents=True, exist_ok=True)
 
-    file_path = merges_dir / _merge_filename(preview["node_a_id"], preview["node_b_id"])
+    file_path = merges_dir / filename
+
+    # ✅ Si ya existe la misma conexión en borrador, no la duplicamos
+    if file_path.exists():
+        print(f"-> Merge draft already exists for edge {edge_idx}: {file_path.name}")
+        return file_path
+
+    preview["component_id"] = component_id
+
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(preview, f, indent=2, ensure_ascii=False)
 
@@ -62,25 +74,7 @@ def create_pending_merge(project_path: Path, cluster_idx: int, edge_idx: int) ->
     return file_path
 
 
-def list_pending_merges(project_path: Path) -> list[dict]:
-    """Lists all merge drafts in the merges/ directory with their recomputed status."""
-    corpus, _ = load_draft(project_path)
 
-    merges_dir = project_path / "merges"
-    if not merges_dir.exists():
-        return []
-
-    results = []
-    for file_path in sorted(merges_dir.glob("merge_*.json")):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            data["_status"] = compute_status(data, corpus)
-            results.append(data)
-        except Exception as e:
-            print(f"Error reading {file_path}: {e}")
-
-    return results
 
 
 def execute_merge(project_path: Path, node_a_id: int, node_b_id: int) -> str:
@@ -136,7 +130,7 @@ def execute_merge(project_path: Path, node_a_id: int, node_b_id: int) -> str:
         # 2. Compute the new filename using the updated active node IDs
         # (e.g., merge_0_1.json -> merge_1_15.json)
         new_file_path = project_path / "merges" / _merge_filename(
-            fresh["node_a_id"], fresh["node_b_id"]
+            fresh["node_a_id"], fresh["node_b_id"], 
         )
 
         # 3. Save the regenerated draft (its fields are reset, so its status becomes "draft")
@@ -184,7 +178,71 @@ def forget_merges(project_path: Path, confirm: bool = False):
         print(f"-> 'merges/' directory removed for {project_path.name}.")
 
 
+# def has_pending_merges(project_path: Path) -> bool:
+#     """Returns whether any merge draft files exist in the merges/ directory."""
+#     merges_dir = project_path / "merges"
+#     return merges_dir.exists() and any(merges_dir.glob("merge_*.json"))
+
+def list_pending_merges(project_path: Path) -> list[dict]:
+    """Lists all merge drafts in the merges/ directory with their recomputed status."""
+    corpus, _ = load_draft(project_path)
+
+    merges_dir = project_path / "merges"
+    if not merges_dir.exists():
+        return []
+
+    results = []
+    # Busca cualquier archivo .json (ej: 199_50_51.json)
+    for file_path in sorted(merges_dir.glob("*.json")):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            data["_status"] = compute_status(data, corpus)
+            data["_file_name"] = file_path.name
+            results.append(data)
+        except Exception as e:
+            print(f"Error reading {file_path}: {e}")
+
+    return results
+
+
 def has_pending_merges(project_path: Path) -> bool:
     """Returns whether any merge draft files exist in the merges/ directory."""
     merges_dir = project_path / "merges"
-    return merges_dir.exists() and any(merges_dir.glob("merge_*.json"))
+    return merges_dir.exists() and any(merges_dir.glob("*.json"))
+
+def forget_single_merge(project_path: Path, filename: str) -> bool:
+    """Deletes a specific merge draft file from the merges/ directory."""
+    file_path = project_path / "merges" / filename
+    if file_path.exists():
+        file_path.unlink()
+        print(f"-> Merge draft {filename} deleted.")
+        return True
+    return False
+
+def refresh_cluster_merges(project_path: Path, component_id: int | str):
+    """
+    Scans and updates or removes stale/obsolete merge drafts for a specific cluster.
+    """
+    corpus, report = load_draft(project_path)
+    merges_dir = project_path / "merges"
+    
+    if not merges_dir.exists():
+        return
+
+    # Busca solo los archivos que inicien con el component_id del cluster (ej: 199_*.json)
+    cluster_files = list(merges_dir.glob(f"{component_id}_*.json"))
+    
+    for file_path in cluster_files:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                merge_data = json.load(f)
+            
+            status = compute_status(merge_data, corpus)
+            
+            # Si se volvió auto-merge u obsoleto, lo eliminamos automáticamente
+            if status in ("obsolete", "discarded"):
+                file_path.unlink()
+                print(f"-> Auto-cleared obsolete merge draft: {file_path.name}")
+        except Exception as e:
+            print(f"Error refreshing {file_path}: {e}")

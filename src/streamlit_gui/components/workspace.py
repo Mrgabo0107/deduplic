@@ -12,6 +12,7 @@ from src.streamlit_gui.components.workspace_src import (
     render_component_item,
     render_project_global_actions,
 )
+from src.streamlit_gui.components.workspace_src.merge_dialog import render_merge_modal
 
 
 def get_active_report(project_name: str):
@@ -21,12 +22,20 @@ def get_active_report(project_name: str):
             return json.load(f)
     return load_project_report(project_name)
 
+
 def render_workspace(project_name: str | None):
     """Renders the main workspace based on the active project."""
 
     if not project_name:
         st.info("👈 Select a project from the sidebar or click **'➕ New Project'** to get started.")
         return
+
+    # -------------------------------------------------------------------
+    # AUTO-TRIGGER: Si la sesión activó el diálogo de merges, lo abre
+    # -------------------------------------------------------------------
+    if st.session_state.get("open_merge_dialog", False):
+        st.session_state["open_merge_dialog"] = False
+        render_merge_modal(project_name)
 
     projects_info = get_projects_info()
     status = projects_info.get(project_name)
@@ -73,11 +82,9 @@ def render_workspace(project_name: str | None):
             if c.get("nodes")
         ]
 
+        # Muestra el aviso de éxito cuando no quedan clusters, pero NO detiene el render
         if not clusters:
-            st.success("All clusters have been resolved! You are ready to commit.")
-            if st.button("✅ Commit Project", type="primary"):
-                st.toast("Project committed successfully!")
-            return
+            st.success("🎉 All clusters have been resolved! You are ready to commit your changes.")
 
         mtime = get_corpus_mtime(project_name)
         corpus_lookup = get_cached_corpus(project_name, mtime)
@@ -118,12 +125,9 @@ def render_workspace(project_name: str | None):
         st.markdown("---")
 
         # --- RENDERIZADO DE CLUSTERS ---
-        # for rel_idx, component in enumerate(visible_clusters):
-        #     render_component_item(component, start_idx, rel_idx, corpus_lookup)
-
         for rel_idx, component in enumerate(visible_clusters):
             render_component_item(
-                project_name,  # <-- Pasa project_name como primer argumento
+                project_name,
                 component, 
                 start_idx, 
                 rel_idx, 

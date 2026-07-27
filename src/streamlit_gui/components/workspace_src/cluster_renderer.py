@@ -1,7 +1,6 @@
 import streamlit as st
 from src.streamlit_gui.components.workspace_src.corpus_loader import (
     AVAILABLE_METHODS,
-    EXCLUDED_METHODS,
 )
 from src.streamlit_gui.services.dedup_service import (
     resolve_edge_action,
@@ -182,7 +181,7 @@ def render_component_item(
         
         with c1:
             cluster_methods = [
-                m for m in AVAILABLE_METHODS if m not in EXCLUDED_METHODS
+                m for m in AVAILABLE_METHODS
             ]
             selected_cluster_method = st.selectbox(
                 "Method",

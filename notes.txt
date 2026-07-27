@@ -43,3 +43,5 @@ debera testearse como libreria crear test unitarios dado qeu si sirve como libre
  proyects al hacerlo 
 
  poner una barra de carga para bloquear la app si se esta cargando un json 
+
+ boton borrar proyecto

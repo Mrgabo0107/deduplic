@@ -1,29 +1,49 @@
 # src/streamlit_gui/components/workspace_src/merge_dialog.py
 
+import json
 import streamlit as st
-import difflib
+
 from src.streamlit_gui.services.dedup_service import (
     get_pending_merges_service,
     execute_single_merge_service,
     forget_single_merge_service,
-    forget_all_merges_service, # <-- Nuevo servicio
+    forget_all_merges_service,
+)
+from src.streamlit_gui.utils.project_loader import PROJECTS_DIR
+from src.streamlit_gui.components.workspace_src.merge_editor_view import (
+    render_focused_editor,
+    save_merge_draft_file,
 )
 
 
-def _render_diff_html(text_a: str, text_b: str) -> str:
-    """Genera un HTML simple con diferencias resaltadas en verde/rojo entre dos textos."""
-    matcher = difflib.SequenceMatcher(None, text_a, text_b)
-    html_a = []
-    
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            html_a.append(text_a[i1:i2])
-        elif tag == 'delete' or tag == 'replace':
-            html_a.append(f"<span style='background-color: #ff4d4d; color: white; padding: 0 2px;'>{text_a[i1:i2]}</span>")
-        elif tag == 'insert':
-            html_a.append(f"<span style='background-color: #2eb82e; color: white; padding: 0 2px;'>{text_b[j1:j2]}</span>")
-            
-    return "".join(html_a)
+def render_text_box(text_content: str, max_height: int = 150):
+    """Renderiza un cuadro de texto formateado con scroll, alineación izquierda y sin sangría."""
+    if not text_content or text_content == "None":
+        text_content = "<i style='color: #888;'>Empty / None</i>"
+    else:
+        text_content = text_content.strip().replace("<", "&lt;").replace(">", "&gt;")
+
+    html_code = f"""
+    <div style="
+        background-color: #1e1e1e;
+        color: #e0e0e0;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 10px;
+        max-height: {max_height}px;
+        overflow-y: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        text-align: left;
+        text-indent: 0px !important;
+        white-space: pre-wrap;
+        word-break: break-word;
+    ">
+        {text_content}
+    </div>
+    """
+    st.markdown(html_code, unsafe_allow_html=True)
 
 
 @st.dialog("Merge manager", width="large")
@@ -31,19 +51,19 @@ def render_merge_modal(project_name: str):
     pending_merges = get_pending_merges_service(project_name)
 
     if not pending_merges:
-        st.info("No pending merges to resolve!")
+        st.info("🎉 No pending merges to resolve!")
         if st.button("Close", use_container_width=True):
             st.rerun()
         return
 
-    # 1. Mapa de Opciones
+    # Mapa de Opciones
     options_map = {
-        f"{m.get('node_a_id')} ↔ {m.get('node_b_id')}": idx
+        f"Node {m.get('node_a_id')} ↔ Node {m.get('node_b_id')}": idx
         for idx, m in enumerate(pending_merges)
     }
 
-    # Controles superiores (Selectbox + Skip + Skip All)
-    col_sel, _, col_skip, col_skip_all = st.columns([4,1, 1, 1])
+    # Controles superiores
+    col_sel, _, col_skip, col_skip_all = st.columns([4, 0.5, 1.2, 1.3])
 
     with col_sel:
         selected_label = st.selectbox(
@@ -53,20 +73,33 @@ def render_merge_modal(project_name: str):
             label_visibility="collapsed"
         )
 
-    # Extraemos los datos del merge seleccionado de forma anticipada
     current_idx = options_map[selected_label]
-    merge_item = pending_merges[current_idx]
-    filename = merge_item.get("_file_name", "")
-    node_a = merge_item.get("node_a", {})
-    node_b = merge_item.get("node_b", {})
-    node_a_id = merge_item.get("node_a_id")
-    node_b_id = merge_item.get("node_b_id")
-    component_id = merge_item.get("component_id", "cluster")
+    merge_item_disk = pending_merges[current_idx]
+    filename = merge_item_disk.get("_file_name", "")
+
+    # =========================================================================
+    # INICIALIZACIÓN DE MERGE_STATUS (ESTADO INTERACTIVO EN MEMORIA)
+    # =========================================================================
+    if "merge_status" not in st.session_state or st.session_state.get("_current_merge_filename") != filename:
+        st.session_state["merge_status"] = json.loads(json.dumps(merge_item_disk))
+        st.session_state["_current_merge_filename"] = filename
+
+    merge_status = st.session_state["merge_status"]
+
+    rec_a = merge_status.get("rec_a", {})
+    rec_b = merge_status.get("rec_b", {})
+    saved_fields = merge_status.get("fields", {})
+
+    node_a_id = merge_status.get("node_a_id")
+    node_b_id = merge_status.get("node_b_id")
+    component_id = merge_status.get("component_id", "cluster")
 
     with col_skip:
         if st.button("Skip", key=f"btn_forget_{filename}", type="secondary", use_container_width=True):
             forget_single_merge_service(project_name, filename)
             st.toast(f"Discarded merge {filename}")
+            if "merge_status" in st.session_state:
+                del st.session_state["merge_status"]
             st.session_state["open_merge_dialog"] = True
             st.rerun()
 
@@ -74,70 +107,119 @@ def render_merge_modal(project_name: str):
         if st.button("Skip All", key=f"btn_forget_all_{project_name}", type="secondary", use_container_width=True):
             forget_all_merges_service(project_name)
             st.toast("Discarded all pending merges!")
+            if "merge_status" in st.session_state:
+                del st.session_state["merge_status"]
             st.rerun()
 
     st.markdown("---")
 
-    # 2. Encabezado de información
-    st.caption(f"Status: **{merge_item.get('_status', 'draft').upper()}** | File: `{filename}`")
+    # =========================================================================
+    # VISTA ENFOCADA DE EDICIÓN AMPLIADA
+    # =========================================================================
+    if "active_edit_key" in st.session_state:
+        render_focused_editor(project_name, filename)
+        return
 
-    # 3. Comparación de llaves
-    all_keys = sorted(list(set(node_a.keys()) | set(node_b.keys())))
-    resolved_fields = {}
+    # =========================================================================
+    # VISTA GENERAL DE CAMPOS (Basada en merge_status)
+    # =========================================================================
+    all_keys = sorted(list(set(rec_a.keys()) | set(rec_b.keys())))
 
-    for key in all_keys:
-        if key.startswith("_"):
-            continue
+    with st.container(height=500):
+        for key in all_keys:
+            if key.startswith("_"):
+                continue
 
-        val_a = str(node_a.get(key, ""))
-        val_b = str(node_b.get(key, ""))
+            val_a = str(rec_a.get(key, ""))
+            val_b = str(rec_b.get(key, ""))
+            
+            key_saved = saved_fields.get(key, {})
+            init_keep = key_saved.get("keep", False)
+            init_source = key_saved.get("source", "a") or "a"
+            init_edit = key_saved.get("edit", None)
 
-        with st.container(border=True):
-            st.markdown(f"**Field: `{key}`**")
-            col_a, col_b = st.columns(2)
+            with st.container(border=True):
+                col_title, col_toggle = st.columns([5, 1])
+                with col_title:
+                    st.markdown(f"### `{key}`")
+                with col_toggle:
+                    toggle_key = f"toggle_{filename}_{key}"
+                    keep_field = st.toggle("Keep", value=init_keep, key=toggle_key)
 
-            with col_a:
-                st.markdown(f"**Record A (ID: {node_a_id})**")
-                st.code(val_a if val_a else "None", language=None)
+                if "fields" not in merge_status:
+                    merge_status["fields"] = {}
 
-            with col_b:
-                st.markdown(f"**Record B (ID: {node_b_id})**")
-                st.code(val_b if val_b else "None", language=None)
+                if not keep_field:
+                    merge_status["fields"][key] = {"keep": False, "source": None, "edit": None}
+                else:
+                    col_a, col_b = st.columns(2)
 
-            choice = st.radio(
-                f"Keep for `{key}`:",
-                options=["Record A", "Record B", "Custom Edit"],
-                horizontal=True,
-                key=f"radio_{filename}_{key}"
-            )
+                    val_a_display = init_edit if (init_source == "a" and init_edit is not None) else val_a
+                    val_b_display = init_edit if (init_source == "b" and init_edit is not None) else val_b
 
-            if choice == "Record A":
-                resolved_fields[key] = val_a
-            elif choice == "Record B":
-                resolved_fields[key] = val_b
-            else:
-                if val_a != val_b:
-                    diff_html = _render_diff_html(val_a, val_b)
-                    st.markdown("**Difference Preview (Diff):**", unsafe_allow_html=True)
-                    st.markdown(f"<div style='background-color: #1e1e1e; padding: 8px; border-radius: 4px;'>{diff_html}</div>", unsafe_allow_html=True)
+                    with col_a:
+                        st.markdown(f"**{node_a_id}**" + (" *(Edited)*" if init_source == "a" and init_edit is not None else ""))
+                        render_text_box(val_a_display, max_height=140)
 
-                custom_val = st.text_area(
-                    f"Edit value for `{key}`:",
-                    value=val_a,
-                    key=f"custom_{filename}_{key}"
-                )
-                resolved_fields[key] = custom_val
+                    with col_b:
+                        st.markdown(f"**{node_b_id}**" + (" *(Edited)*" if init_source == "b" and init_edit is not None else ""))
+                        render_text_box(val_b_display, max_height=140)
+
+                    col_rad, col_btn_edit = st.columns([3, 1])
+                    
+                    radio_options = [f"{node_a_id}", f"{node_b_id}"]
+                    init_radio_idx = 1 if init_source == "b" else 0
+
+                    with col_rad:
+                        source_selected = st.radio(
+                            f"Select Source for `{key}`:",
+                            options=radio_options,
+                            index=init_radio_idx,
+                            horizontal=True,
+                            key=f"radio_src_{filename}_{key}",
+                            label_visibility="collapsed"
+                        )
+                    
+                    selected_src_code = "a" if source_selected == radio_options[0] else "b"
+
+                    with col_btn_edit:
+                        if st.button("Edit", key=f"btn_edit_{filename}_{key}", use_container_width=True):
+                            st.session_state["active_edit_key"] = {
+                                "key": key,
+                                "base_source": selected_src_code,
+                            }
+                            st.session_state["open_merge_dialog"] = True
+                            st.rerun()
+
+                    merge_status["fields"][key] = {
+                        "keep": True, 
+                        "source": selected_src_code, 
+                        "edit": init_edit if selected_src_code == init_source else None
+                    }
+
+    save_merge_draft_file(project_name, filename, merge_status)
 
     st.markdown("---")
 
-    # 4. Confirmar Fusión
+    # =========================================================================
+    # APLICAR MERGE DEFINITIVO
+    # =========================================================================
     if st.button("✅ Apply Merge Decision", type="primary", use_container_width=True):
+        save_merge_draft_file(project_name, filename, merge_status)
+
         execute_single_merge_service(
             project_name=project_name,
             node_a_id=node_a_id,
             node_b_id=node_b_id,
             component_id=component_id
         )
+        
+        # Limpiamos el estado en memoria para permitir cargar el siguiente borrador
+        if "merge_status" in st.session_state:
+            del st.session_state["merge_status"]
+        if "_current_merge_filename" in st.session_state:
+            del st.session_state["_current_merge_filename"]
+
         st.toast("Merge applied successfully!", icon="✨")
         st.session_state["open_merge_dialog"] = True
         st.rerun()

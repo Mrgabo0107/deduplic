@@ -11,19 +11,24 @@ from src.streamlit_gui.services.dedup_service import (
     restore_project_action,
     get_pending_merges_service,
 )
-from src.streamlit_gui.components.workspace_src.merge_dialog import render_merge_modal
+from src.streamlit_gui.utils.project_loader import get_projects_info
 
 
 def _on_commit_project(project_name: str, total_clusters: int):
     try:
         commit_project_action(project_name, remaining_clusters_count=total_clusters)
-        # Limpiamos el caché del reporte en sesión
-        if "active_report" in st.session_state:
-            del st.session_state["active_report"]
+        
+        # Limpiar reportes
+        st.session_state.pop("active_report", None)
+        st.session_state.pop(f"report_data_{project_name}", None)
+        
+        # Asegurar que la barra lateral mantenga seleccionado el proyecto recién comiteado
+        st.session_state["selected_project_name"] = project_name
+        st.session_state["sidebar_project_selectbox"] = project_name
+
         st.toast("Project changes successfully committed!")
     except Exception as e:
         st.error(f"Commit failed: {e}")
-
 
 def _on_restore_project(project_name: str):
     try:

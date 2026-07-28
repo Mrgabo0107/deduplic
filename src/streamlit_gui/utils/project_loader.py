@@ -57,12 +57,19 @@ def load_project_report(project_name: str, force_reload: bool = False) -> dict |
     return st.session_state[key]
 
 
-def load_dedup_corpus(project_name: str) -> dict | None:
-    """Loads dedup_corpus.json from a committed project."""
+@st.cache_data(show_spinner="Loading deduplicated corpus...")
+def load_dedup_corpus(project_name: str) -> list[dict] | None:
+    """Carga dedup_corpus.json de un proyecto committed de forma optimizada en memoria."""
     dedup_file = PROJECTS_DIR / project_name / "dedup_corpus.json"
     if dedup_file.exists():
         with open(dedup_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            
+            # Normalizamos si viene como dict o list
+            if isinstance(data, dict):
+                return [{"id": k, **(v if isinstance(v, dict) else {"value": v})} for k, v in data.items()]
+            elif isinstance(data, list):
+                return data
     return None
 
 

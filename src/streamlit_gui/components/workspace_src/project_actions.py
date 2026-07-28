@@ -18,7 +18,7 @@ def _on_resolve_all(project_name: str, method_key: str):
     method = st.session_state.get(method_key)
     print(f"--> [DEBUG Callback] Resolviendo proyecto '{project_name}' con método '{method}'")
     resolve_all_action(project_name=project_name, method_name=method)
-    st.toast("All pending clusters resolved successfully!", icon="🚀")
+    st.toast("All pending clusters resolved successfully!")
 
 
 def _on_commit_project(project_name: str, total_clusters: int):
@@ -27,7 +27,7 @@ def _on_commit_project(project_name: str, total_clusters: int):
         # Limpiamos el caché del reporte en sesión
         if "active_report" in st.session_state:
             del st.session_state["active_report"]
-        st.toast("Project changes successfully committed!", icon="💾")
+        st.toast("Project changes successfully committed!")
     except Exception as e:
         st.error(f"Commit failed: {e}")
 
@@ -37,7 +37,7 @@ def _on_restore_project(project_name: str):
         restore_project_action(project_name)
         if "active_report" in st.session_state:
             del st.session_state["active_report"]
-        st.toast("Project restored to original state!", icon="🔄")
+        st.toast("Project restored to original state")
     except Exception as e:
         st.error(f"Restore failed: {e}")
 
@@ -50,7 +50,6 @@ def render_project_global_actions(project_name: str, total_clusters: int):
     merges_count = len(pending_merges)
     has_merges = merges_count > 0
 
-    # 1. SECCIÓN: DEDUPLICATE ALL (Solo si quedan clusters)
     if total_clusters > 0:
         # ... (tu código del selector deduplicate all) ...
         pass
@@ -60,15 +59,14 @@ def render_project_global_actions(project_name: str, total_clusters: int):
 
     if has_merges:
         st.warning(
-            f"⚠️ You have **{merges_count}** pending merge operation(s) to resolve before committing.",
-            icon="⚠️"
+            f"You have **{merges_count}** pending merge operation(s) to resolve before committing."
         )
 
     col_commit, col_restore, col_merge = st.columns([2, 2, 3])
 
     with col_commit:
         st.button(
-            "💾 Commit Changes",
+            "Commit",
             key=f"btn_commit_{project_name}",
             type="primary",
             disabled=has_merges,
@@ -79,7 +77,7 @@ def render_project_global_actions(project_name: str, total_clusters: int):
 
     with col_restore:
         st.button(
-            "🔄 Restore Original",
+            "Restore",
             key=f"btn_restore_{project_name}",
             type="secondary",
             on_click=_on_restore_project,
@@ -89,6 +87,6 @@ def render_project_global_actions(project_name: str, total_clusters: int):
 
     with col_merge:
         # Botón que invoca el modal de merges
-        label_merge = f"🧩 Solve Merges ({merges_count})" if has_merges else "🧩 Solve Merges"
+        label_merge = f"Solve Merges ({merges_count})" if has_merges else "Merges"
         if st.button(label_merge, key=f"btn_solve_merges_{project_name}", type="secondary", use_container_width=True):
             render_merge_modal(project_name)

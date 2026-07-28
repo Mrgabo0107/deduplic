@@ -225,7 +225,7 @@ def render_workspace(project_name: str | None):
 
         # Muestra el aviso de éxito cuando no quedan clusters, pero NO detiene el render
         if not clusters:
-            st.success("🎉 All clusters have been resolved! You are ready to commit your changes.")
+            st.success("All clusters have been resolved! You are ready to commit your changes.")
 
         mtime = get_corpus_mtime(project_name)
         corpus_lookup = get_cached_corpus(project_name, mtime)

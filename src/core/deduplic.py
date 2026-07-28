@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 from core.methods import apply_method
 from core.draft_io import load_draft, save_draft
-from core.merge_manager import create_pending_merge, has_pending_merges, forget_merges
+from core.merge_manager import create_pending_merge, has_pending_merges, forget_merges, refresh_cluster_merges
 
 
 def _process_edge(
@@ -43,7 +43,8 @@ def _process_edge(
         "project_path": project_path,
         "cluster_idx": cluster_idx,
         "edge_idx": edge_idx,
-        "edge": target_edge
+        "edge": target_edge,
+        "project_path": project_path
     }
     
     return apply_method(method, corpus, report, target_info)
@@ -67,7 +68,6 @@ def _process_cluster(
     while cluster.get("edges_trazability"):
         corpus, report = _process_edge(corpus, report, cluster_idx, 0, method)
         cluster = report[cluster_idx]
-    
     return corpus, report
 
 
@@ -85,6 +85,9 @@ def deduplic_connection(project_path: Path, cluster_idx: int, edge_idx: int, met
     
     save_draft(project_path, corpus, report)
 
+    component_id = report[cluster_idx].get("component_id", cluster_idx)
+    refresh_cluster_merges(project_path, component_id)
+
 
 
 def deduplic_cluster(project_path: Path, cluster_idx: int, method: str = "keep_all"):
@@ -99,10 +102,13 @@ def deduplic_cluster(project_path: Path, cluster_idx: int, method: str = "keep_a
     corpus, report = load_draft(project_path)
     try:
         corpus, report = _process_cluster(corpus, report, cluster_idx, method)
+        # refresh_cluster_merges(project_path, cluster_idx)
     except Exception as e:
         print(f"Error: {e}")
         return
     save_draft(project_path, corpus, report)
+    component_id = report[cluster_idx].get("component_id", cluster_idx)
+    refresh_cluster_merges(project_path, component_id)
 
 def deduplic_cluster_by_comp_id(project_path: Path, id_to_find: int, method: str = "keep_all"):
     _, report = load_draft(project_path)

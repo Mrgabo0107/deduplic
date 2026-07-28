@@ -1,5 +1,3 @@
-# src/streamlit_gui/components/workspace_src/merge_dialog.py
-
 import json
 import streamlit as st
 
@@ -14,6 +12,7 @@ from src.streamlit_gui.components.workspace_src.merge_editor_view import (
     render_focused_editor,
     save_merge_draft_file,
 )
+from src.core.merge_manager import refresh_cluster_merges
 
 
 def render_text_box(text_content: str, max_height: int = 150):
@@ -51,7 +50,7 @@ def render_merge_modal(project_name: str):
     pending_merges = get_pending_merges_service(project_name)
 
     if not pending_merges:
-        st.info("🎉 No pending merges to resolve!")
+        st.info("No pending merges to resolve!")
         if st.button("Close", use_container_width=True):
             st.rerun()
         return
@@ -92,7 +91,6 @@ def render_merge_modal(project_name: str):
 
     node_a_id = merge_status.get("node_a_id")
     node_b_id = merge_status.get("node_b_id")
-    component_id = merge_status.get("component_id", "cluster")
 
     with col_skip:
         if st.button("Skip", key=f"btn_forget_{filename}", type="secondary", use_container_width=True):
@@ -180,7 +178,7 @@ def render_merge_modal(project_name: str):
                             label_visibility="collapsed"
                         )
                     
-                    selected_src_code = "a" if source_selected == radio_options[0] else "b"
+                    selected_src_code = node_a_id if source_selected == radio_options[0] else node_b_id
 
                     with col_btn_edit:
                         if st.button("Edit", key=f"btn_edit_{filename}_{key}", use_container_width=True):
@@ -204,22 +202,34 @@ def render_merge_modal(project_name: str):
     # =========================================================================
     # APLICAR MERGE DEFINITIVO
     # =========================================================================
-    if st.button("✅ Apply Merge Decision", type="primary", use_container_width=True):
+    if st.button("Apply Merge Decision", type="primary", use_container_width=True):
+        # 1. Guardar decisiones activas en disco
         save_merge_draft_file(project_name, filename, merge_status)
 
-        execute_single_merge_service(
+        # 2. Extraer metadatos exactos directamente del objeto merge_status
+        target_component_id = merge_status.get("component_id", "cluster")
+        target_node_a = merge_status.get("node_a_id", node_a_id)
+        target_node_b = merge_status.get("node_b_id", node_b_id)
+
+        # 3. Ejecutar la fusión y refrescar
+        result = execute_single_merge_service(
             project_name=project_name,
-            node_a_id=node_a_id,
-            node_b_id=node_b_id,
-            component_id=component_id
+            node_a_id=target_node_a,
+            node_b_id=target_node_b,
+            component_id=target_component_id
         )
         
-        # Limpiamos el estado en memoria para permitir cargar el siguiente borrador
-        if "merge_status" in st.session_state:
-            del st.session_state["merge_status"]
-        if "_current_merge_filename" in st.session_state:
-            del st.session_state["_current_merge_filename"]
+        # 4. Feedback e inactivación de variables de estado
+        if result == "applied":
+            st.toast("Merge applied successfully!")
+            if "merge_status" in st.session_state:
+                del st.session_state["merge_status"]
+            if "_current_merge_filename" in st.session_state:
+                del st.session_state["_current_merge_filename"]
+        elif result == "not_ready":
+            st.warning("The merge decision is incomplete. Please keep at least one field and select its source.")
+        else:
+            st.info(f"Merge status updated: {result}")
 
-        st.toast("Merge applied successfully!", icon="✨")
         st.session_state["open_merge_dialog"] = True
         st.rerun()

@@ -133,4 +133,9 @@ def keep_all(
         # No connected nodes remain in the cluster
         cluster["leader"] = None
 
+    # from core.merge_manager import refresh_cluster_merges
+    # component_id = cluster.get("component_id")
+    # project_path = target_info.get("project_path")
+    # refresh_cluster_merges(project_path, component_id)
+
     return corpus, report

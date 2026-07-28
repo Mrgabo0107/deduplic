@@ -143,6 +143,7 @@ def apply_merge_decision(
     )
 
     # 5. Update the cluster structure
+    
     update_cluster_structure(cluster, untouched_edges + new_edges_for_c)
 
     return corpus, report

@@ -6,7 +6,7 @@ from src.streamlit_gui.utils.project_loader import PROJECTS_DIR
 
 def save_merge_draft_file(project_name: str, filename: str, merge_status: dict):
     """Escribe el objeto merge_status directamente en el archivo JSON del disco."""
-    file_path = PROJECTS_DIR / project_name / ".draft" / "merges" / filename
+    file_path = PROJECTS_DIR / project_name / "merges" / filename
     if file_path.exists():
         clean_data = {k: v for k, v in merge_status.items() if not k.startswith("_")}
         with open(file_path, "w", encoding="utf-8") as f:

@@ -164,5 +164,9 @@ def keep_newest(
 
     # 4. Actualizar la estructura final del cluster
     update_cluster_structure(cluster, untouched_edges + new_edges_for_c)
+    # from core.merge_manager import refresh_cluster_merges
+    # component_id = cluster.get("component_id")
+    # project_path = target_info.get("project_path")
+    # refresh_cluster_merges(project_path, component_id)
 
     return corpus, report

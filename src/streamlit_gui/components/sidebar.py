@@ -58,7 +58,7 @@ def render_sidebar() -> str | None:
                             if created_path is None:
                                 st.balloon()
                                 st.success(
-                                    f"🎉 No duplicates were found in '{uploaded_file.name}' "
+                                    f"No duplicates were found in '{uploaded_file.name}' "
                                     f"using a threshold of {threshold}. No project was created."
                                 )
                             else:
@@ -67,13 +67,11 @@ def render_sidebar() -> str | None:
                                 # Toast notification
                                 if actual_name != base_name:
                                     st.toast(
-                                        f"A project with that name already exists. Saved as '{actual_name}'.",
-                                        icon="ℹ️"
+                                        f"A project with that name already exists. Saved as '{actual_name}'."
                                     )
                                 else:
                                     st.toast(
                                         f"Project '{actual_name}' created successfully.",
-                                        icon="✅"
                                     )
 
                                 # Automatically select the newly created project

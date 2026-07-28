@@ -311,20 +311,23 @@ def restore_project_action(project_name: str):
 
 # --- SERVICIOS DE MERGE MANAGER ---
 
+
+
 def execute_single_merge_service(project_name: str, node_a_id: int, node_b_id: int, component_id: int | str):
     """
     Aplica el merge entre node_a y node_b y luego auto-limpia 
     los borradores obsoletos de ese mismo cluster.
     """
-    project_path = PROJECTS_DIR / project_name
+    project_path = PROJECTS_DIR /project_name 
     
-    # 1. Ejecutar la fusión en el corpus / report (y elimina el merge actual)
-    result = execute_merge(project_path, node_a_id, node_b_id)
-    
-    # 2. Auto-limpiar o actualizar otros borradores pendientes en el mismo cluster
+    # 1. Ejecutar la fusión con el component_id calculado
+    result = execute_merge(project_path, node_a_id, node_b_id, component_id)
+    # 2. Refrescar la carpeta merges/ en la raíz para ese cluster
     refresh_cluster_merges(project_path, component_id)
     
     return result
+
+
 
 
 def execute_all_merges_service(project_name: str, strategy: str = "Keep Most Complete") -> bool:
@@ -364,3 +367,4 @@ def forget_all_merges_service(project_name: str):
     """Elimina la carpeta completa de merges/ del proyecto."""
     project_path = PROJECTS_DIR / project_name
     forget_merges(project_path, confirm=True)
+

@@ -1,9 +1,21 @@
 import json
 from pathlib import Path
 import streamlit as st
+import shutil
 from cli_cmds.cmd_deduplic_init import deduplic_init, init_workspace
 
 PROJECTS_DIR = Path(__file__).resolve().parents[3] / "projects"
+
+
+def delete_project_directory(project_name: str) -> bool:
+    """Elimina completamente la carpeta del proyecto del disco."""
+    if not project_name:
+        return False
+    project_path = PROJECTS_DIR / project_name
+    if project_path.exists() and project_path.is_dir():
+        shutil.rmtree(project_path)
+        return True
+    return False
 
 
 def get_projects_info() -> dict:

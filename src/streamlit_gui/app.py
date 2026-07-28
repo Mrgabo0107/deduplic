@@ -4,7 +4,7 @@ from streamlit_gui.components.workspace import render_workspace
 
 st.set_page_config(
     page_title="Deduplic",
-    page_icon="⚡",
+    page_icon="🖇️",
     layout="wide"
 )
 

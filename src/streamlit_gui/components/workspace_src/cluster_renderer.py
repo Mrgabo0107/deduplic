@@ -54,7 +54,7 @@ def render_connection_explorer(
         st.info("No connections found for this component.")
         return
 
-    col_nav, col_detail = st.columns([1, 6])
+    col_nav, col_detail = st.columns([1, 9])
     total_edges = len(edges)
     MAX_EDGES_PER_PAGE = 10
 
@@ -138,7 +138,7 @@ def render_connection_explorer(
         st.markdown("---")
 
         st.markdown("##### Resolve connection by method:")
-        m_col, b_col = st.columns([3, 1])
+        m_col, b_col, _ = st.columns([3, 1, 5])
 
         method_key = f"method_edge_{component_id}_{c_idx}_{e_idx}"
 
@@ -185,18 +185,19 @@ def render_component_item(
     is_expanded = (st.session_state.get("active_cluster_id") == component_id)
 
     with st.expander(label, expanded=is_expanded):
+        render_connection_explorer(
+            project_name, component_id, c_idx, edges, corpus_lookup
+        )
+        st.markdown("---")
         st.markdown("##### Resolve cluster by method:")
-        c1, c2 = st.columns([3, 1])
+        c1, _, c2 = st.columns([3, 6, 1])
         
         cluster_method_key = f"method_comp_{component_id}_{c_idx}"
         
         with c1:
-            cluster_methods = [
-                m for m in AVAILABLE_METHODS
-            ]
             selected_cluster_method = st.selectbox(
                 "Method",
-                options=cluster_methods,
+                options=AVAILABLE_METHODS,
                 key=cluster_method_key,
                 label_visibility="collapsed",
             )
@@ -208,8 +209,3 @@ def render_component_item(
                 on_click=_on_resolve_cluster,
                 args=(project_name, component_id, cluster_method_key)
             )
-
-        st.markdown("---")
-        render_connection_explorer(
-            project_name, component_id, c_idx, edges, corpus_lookup
-        )

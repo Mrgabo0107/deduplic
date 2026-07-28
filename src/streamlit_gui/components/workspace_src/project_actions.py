@@ -14,13 +14,6 @@ from src.streamlit_gui.services.dedup_service import (
 from src.streamlit_gui.components.workspace_src.merge_dialog import render_merge_modal
 
 
-def _on_resolve_all(project_name: str, method_key: str):
-    method = st.session_state.get(method_key)
-    print(f"--> [DEBUG Callback] Resolviendo proyecto '{project_name}' con método '{method}'")
-    resolve_all_action(project_name=project_name, method_name=method)
-    st.toast("All pending clusters resolved successfully!")
-
-
 def _on_commit_project(project_name: str, total_clusters: int):
     try:
         commit_project_action(project_name, remaining_clusters_count=total_clusters)
@@ -50,19 +43,40 @@ def render_project_global_actions(project_name: str, total_clusters: int):
     merges_count = len(pending_merges)
     has_merges = merges_count > 0
 
+    # 1. SECCIÓN: ACCIÓN GLOBAL (Deduplicate All)
     if total_clusters > 0:
-        # ... (tu código del selector deduplicate all) ...
-        pass
+        st.markdown("##### Solve project by method:")
+        col_select, _, col_btn = st.columns([3, 6, 1])
+
+        with col_select:
+            selected_global_method = st.selectbox(
+                "Method for all clusters:",
+                options=[m for m in AVAILABLE_METHODS if m not in EXCLUDED_METHODS],
+                key=f"select_global_method_{project_name}",
+                label_visibility="collapsed",
+            )
+
+        with col_btn:
+            if st.button(
+                "Resolve all",
+                key=f"btn_dedup_all_{project_name}",
+                type="primary",
+                use_container_width=True,
+            ):
+                resolve_all_action(project_name, selected_global_method)
+                st.toast(f"Applied '{selected_global_method}' to all clusters!")
+                st.rerun()
+
+        st.markdown("---")
 
     # 2. SECCIÓN: MERGES PENDIENTES & PERSISTENCIA
-    st.markdown("##### Project Persistence & Merges:")
 
     if has_merges:
         st.warning(
             f"You have **{merges_count}** pending merge operation(s) to resolve before committing."
         )
 
-    col_commit, col_restore, col_merge = st.columns([2, 2, 3])
+    col_commit, col_restore, _, col_merge = st.columns([2, 2, 4, 2])
 
     with col_commit:
         st.button(
@@ -86,7 +100,12 @@ def render_project_global_actions(project_name: str, total_clusters: int):
         )
 
     with col_merge:
-        # Botón que invoca el modal de merges
         label_merge = f"Solve Merges ({merges_count})" if has_merges else "Merges"
-        if st.button(label_merge, key=f"btn_solve_merges_{project_name}", type="secondary", use_container_width=True):
-            render_merge_modal(project_name)
+        if st.button(
+            label_merge,
+            key=f"btn_solve_merges_{project_name}",
+            type="secondary",
+            use_container_width=True,
+        ):
+            st.session_state["open_merge_dialog"] = True
+            st.rerun()

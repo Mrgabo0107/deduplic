@@ -242,7 +242,4 @@ def refresh_cluster_merges(project_path: Path, component_id: int | str):
         except Exception as e:
             print(f"Error refreshing {file_path}: {e}")
 
-def update_merges_after_action(project_path: Path, cluster_idx: int, edge_idx: int):
-    _, report = load_draft(project_path)
-    component_id = report[cluster_idx].get("component_id")
 

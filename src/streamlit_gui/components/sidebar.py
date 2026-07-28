@@ -1,14 +1,18 @@
 import json
 import streamlit as st
-from streamlit_gui.utils.project_loader import get_projects_info, create_new_project_from_upload
+from streamlit_gui.utils.project_loader import (
+    get_projects_info, 
+    create_new_project_from_upload,
+    delete_project_directory
+)
 
 
 def render_sidebar() -> str | None:
-    """Renders the sidebar with the project creation popover and the project selector."""
+    """Renders the sidebar with project creation, selection, and deletion."""
     with st.sidebar:
         st.title("Deduplic")
 
-        with st.popover("➕ New Project", use_container_width=True):
+        with st.popover("New Project", use_container_width=True):
             st.subheader("Upload JSON Corpus")
 
             uploaded_file = st.file_uploader(
@@ -42,12 +46,11 @@ def render_sidebar() -> str | None:
                         step=0.05
                     )
 
-                    if st.button("🚀 Create Project", type="primary", use_container_width=True):
+                    if st.button("Create Project", type="primary", use_container_width=True):
                         if not selected_keys:
                             st.error("You must select at least one field.")
                         else:
                             with st.spinner("Analyzing and processing..."):
-                                # Reset the file pointer before passing it to the function
                                 uploaded_file.seek(0)
                                 created_path, base_name = create_new_project_from_upload(
                                     uploaded_file,
@@ -56,7 +59,6 @@ def render_sidebar() -> str | None:
                                 )
 
                             if created_path is None:
-                                st.balloon()
                                 st.success(
                                     f"No duplicates were found in '{uploaded_file.name}' "
                                     f"using a threshold of {threshold}. No project was created."
@@ -64,7 +66,6 @@ def render_sidebar() -> str | None:
                             else:
                                 actual_name = created_path.name
 
-                                # Toast notification
                                 if actual_name != base_name:
                                     st.toast(
                                         f"A project with that name already exists. Saved as '{actual_name}'."
@@ -74,7 +75,6 @@ def render_sidebar() -> str | None:
                                         f"Project '{actual_name}' created successfully.",
                                     )
 
-                                # Automatically select the newly created project
                                 st.session_state["selected_project_name"] = actual_name
                                 st.rerun()
 
@@ -86,7 +86,7 @@ def render_sidebar() -> str | None:
         # -------------------------------------------------------------------
         # 2. EXISTING PROJECT SELECTOR
         # -------------------------------------------------------------------
-        st.subheader("📂 Projects")
+        st.subheader("Projects")
         projects_info = get_projects_info()
 
         if not projects_info:
@@ -102,7 +102,6 @@ def render_sidebar() -> str | None:
                 icon = "🟢" if status == "committed" else "🟡"
                 return f"{icon} {name} ({status})"
 
-            # Check whether a previous selection exists in session_state
             current_selection = st.session_state.get("selected_project_name")
             current_index = options.index(current_selection) if current_selection in options else None
 
@@ -115,9 +114,33 @@ def render_sidebar() -> str | None:
                 key="sidebar_project_selectbox"
             )
 
-            # Synchronize the selection
             st.session_state["selected_project_name"] = selected_name
 
+        # -------------------------------------------------------------------
+        # 3. DELETE PROJECT BUTTON
+        # -------------------------------------------------------------------
+        # st.markdown("<br><br>", unsafe_allow_html=True)
+        has_active_project = bool(st.session_state.get("selected_project_name"))
+
+        if st.button(
+            "Delete Project",
+            type="secondary",
+            disabled=not has_active_project,
+            use_container_width=True,
+            key="btn_delete_project"
+        ):
+            active_proj = st.session_state.get("selected_project_name")
+            if active_proj:
+                delete_project_directory(active_proj)
+                st.session_state["selected_project_name"] = None
+                
+                # Limpiar cualquier caché de reporte
+                report_key = f"report_data_{active_proj}"
+                if report_key in st.session_state:
+                    del st.session_state[report_key]
+
+                st.toast(f"Project '{active_proj}' deleted successfully.")
+                st.rerun()
         st.markdown("---")
         st.caption("🟢 Committed | 🟡 In Progress")
 

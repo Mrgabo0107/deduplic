@@ -7,41 +7,154 @@ curva ROC: https://es.wikipedia.org/wiki/Curva_ROC
 presition and recall: https://en.wikipedia.org/wiki/Precision_and_recall
 
 
-brainstorming:
-
-en la gui hay qeu mirar qeu pasa si un cluster o proyecto no ha termiando de desduplicarse dejar keep all por defecto poero dar la 
-oportunidad de termianr de desduplicar un cluster por metodos no merge
-
-
-quizas deberia crear un tercer boton que forzara un metodo para todas las conexionse sea por cluster con deduplic_cluster o sea por corpus con el boton deduplic general
-
-
-
-
-
-
-debera crearse un .env para controlar entre otras cosas DEFAULT_THERESHOLD
 
 debera testearse como libreria crear test unitarios dado qeu si sirve como libreria sirve en genral
 
 
 
-    organizar con init_from_file exponer init e init from file y documentar dn cmd init deduplic
+organizar con init_from_file exponer init e init from file y documentar dn cmd init deduplic
 
 
 
 
 
- brainstorming gui:
 
- me aseguraste que con lel proyecto creado hastra esta parte es totalmente factible ahcer un streamlit qeu no se bloquee esto es cierto?
 
- loa verdad no conozco bien streamlit asi qeu me gustaria construir la gui paso a paso asegurandome qeu tenga un beun rendimiento y eificacia
 
- Comienzo imaginando qeu lo mejor es qeu la gui siempre se peuda desplegar la cual en un inicio debera estar vacia salvo por un menu (que por
- la molestia de no poder custimizar el header de streamlit asumo debera estar en el footer) que permita escoger algun proyecto de la carpeta
- proyects al hacerlo 
 
- poner una barra de carga para bloquear la app si se esta cargando un json 
 
- boton borrar proyecto
+
+
+
+
+
+
+
+
+
+Has resumido a la perfección la lista de chequeo (checklist) de un desarrollador senior para refactorizar una librería.
+
+Tu plan ataca exactamente los puntos críticos que diferencian un script común de un paquete profesional listo para producción.
+
+Para que tengas el panorama 100% completo, aquí tienes tu lista consolidada con 3 pequeños detalles técnicos adicionales que debes tener en el radar:
+
+📋 Tu Lista de Chequeo (Consolidada y Pulida)
+Excepciones y Advertencias Centralizadas:
+
+Mover todos los errores y avisos personalizados a src/deduplic/exceptions.py.
+
+Sustituir los raise ValueError genéricos por excepciones con nombre propio cuando aplique (o heredar de ellas).
+
+Cero print(), Todo a logging:
+
+Reemplazar todos los print() internos por logger = logging.getLogger(__name__).
+
+Recordar: la librería solo emite logs (logger.info, logger.warning), no los configura con colores ni manejadores de pantalla dentro del core.
+
+Rutas y Rutas Relativas (Path):
+
+Ajustar referencias de archivos que cambiaron debido a la reestructuración de src/ a src/deduplic/.
+
+Asegurar que config.py resuelva PACKAGE_DIR y PROJECT_PATH de forma neutra usando Path(__file__).resolve().
+
+Definir la API Pública (src/deduplic/__init__.py):
+
+Decidir qué funciones/clases clave se exponen al usuario principal (ej. from .core.deduplic import ...) y definir la lista __all__ en el __init__.py raíz.
+
+Conservar la Estabilidad y Cero Importaciones Circulares:
+
+Mover funciones solo si es estrictamente necesario o si rompen la responsabilidad del módulo; si no rompen nada ni crean ciclos, no moverlas por moverlas.
+
+💡 3 Detallitos Extra a Tener en Cuenta (Para la Excelencia)
+Para que la librería quede impecable, suma estos 3 puntos a tu flujo de trabajo:
+
+Gestión de Archivos Temporales y Salidas (IO):
+
+Si alguna función del core guarda archivos, reportes o borradores en disco, asegúrate de que permita al usuario pasar la ruta de destino como argumento en lugar de hardcodear una ruta dentro del proyecto.
+
+Anotaciones de Tipos (Type Hints):
+
+Asegurar que las funciones públicas tengan sus tipos definidos (ej. def do_reports(data: list[dict], ...) -> list[dict]:). Esto hace que herramientas como VS Code o PyCharm le muestren autocompletado y ayuda instantánea a quien use tu librería.
+
+Documentación Corta (Docstrings):
+
+Mantener un docstring conciso al inicio de cada función pública explicando: qué recibe (Args), qué devuelve (Returns) y qué excepciones puede lanzar (Raises).
+
+¡Con esto en mente, tienes una hoja de ruta perfecta! Estamos listos para revisar archivo por archivo. ¿Cuál es el siguiente en la lista?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+documentar:
+Buen momento para pensarlo — hacerlo durante el refactor (no después) es lo correcto porque estás tocando cada función de todas formas. Aquí van los frentes que suelen escapársele a la gente:
+
+## 1. Docstrings: hazlo por capa, no parejo en todo
+
+No toda función necesita el mismo nivel de detalle:
+
+- **API pública de `core`** (lo que expones en `__init__.py`): docstring completo — qué hace, parámetros con tipo y significado, qué retorna, qué excepciones lanza, y si hay efectos secundarios (escribe archivos, modifica estado). Ejemplo mínimo aceptable:
+  ```python
+  def deduplic_init(path: Path, config: DedupConfig) -> DedupState:
+      """Inicializa el estado de deduplicación para un corpus.
+
+      Args:
+          path: Ruta al archivo JSON con los registros de entrada.
+          config: Configuración de umbrales y método de comparación.
+
+      Returns:
+          Estado inicial serializable, listo para pasar a `deduplic_cluster`.
+
+      Raises:
+          FileNotFoundError: Si `path` no existe.
+          InvalidCorpusError: Si el JSON no cumple el esquema esperado.
+      """
+  ```
+- **Funciones internas/privadas** (`_helper`, cosas en `core/methods/utils.py`): un docstring de una línea basta, o incluso solo un comentario si el nombre ya es autoexplicativo.
+- **`cli_cmds/cmd_*.py`**: no necesita docstring de función — necesita que el `--help` de argparse esté bien escrito (`description=`, `help=` en cada argumento). Esa es su "documentación".
+
+## 2. Lo que casi siempre se escapa (checklist específico para tu caso)
+
+- **Excepciones personalizadas**: documenta en un solo lugar (puede ser un docstring en el módulo donde las defines, o una sección del README) cuándo se lanza cada una — `DeduplicationError`, `InvalidCorpusError`, etc. Si no lo haces, quien consuma la librería solo descubre las excepciones leyendo el código o con prueba y error.
+- **El contrato de los "métodos" de deduplicación** (`keep_first`, `keep_largest`, etc.): como son intercambiables, documenta explícitamente la interfaz común que todos cumplen (firma esperada, qué reciben, qué devuelven) en un solo lugar — probablemente en `core/methods/__init__.py` o un docstring de módulo ahí. Así cuando agregues un método nuevo, sabes exactamente qué contrato cumplir.
+- **Formato de los archivos de estado/JSON que persistes** (`state.json`, merges guardados): esto se te puede olvidar fácilmente porque "ya sabes cómo es", pero seis meses después no. Documenta el esquema (aunque sea informal, un ejemplo de JSON comentado) en algún lado — idealmente cerca de `draft_io.py` o `merge_manager.py`.
+- **Variables de entorno / `config.py`**: cada variable en `.env.example` con un comentario de qué hace y su default.
+- **Efectos secundarios no obvios**: si alguna función de `core` escribe a disco, modifica un archivo de estado global, o depende de orden de llamada (ej. "hay que llamar `init` antes que `cluster`"), eso va en el docstring como advertencia explícita, no se asume que el usuario lo va a intuir.
+
+## 3. Nivel de proyecto (no por función)
+
+- **README.md**: instalación (`pip install deduplic[gui]` vs solo core), quickstart de 5-10 líneas de código mostrando el flujo típico (`init` → `cluster` → revisar → `commit`), y cómo usar los comandos de consola.
+- **CHANGELOG.md**: aunque sea uso interno por ahora, empieza a llevarlo desde ya — durante un refactor grande es el mejor momento porque si no, seis meses después nadie recuerda qué cambió y por qué.
+- **Un ADR informal o sección "Decisiones de diseño"**: cosas como "por qué core no puede importar de cli_cmds" o "por qué streamlit es opcional" — esto es justo lo que hemos discutido en este chat. Vale la pena dejarlo escrito una vez, en vez de tener que reexplicártelo (o explicárselo a otra persona) después.
+
+## 4. Type hints como documentación viva
+
+Esto no reemplaza el docstring, pero reduce mucho lo que tienes que escribir a mano: si `core` está bien tipado (`Path`, `DedupConfig`, `list[Record]`, etc.), herramientas como `mkdocs` + `mkdocstrings` o incluso solo el autocompletado del editor generan buena parte de la documentación de forma automática a partir del código. Vale la pena tipar bien *antes* de escribir docstrings extensos, para no duplicar información entre el tipo y el texto.
+
+## 5. Momento práctico de hacerlo
+
+Como ya estás en Fase B (moviendo lógica de `cli_cmds` a `core`), el momento natural es: **cada vez que muevas/reescribas una función a `core`, escríbele el docstring completo en el mismo commit**, no lo dejes para después — es cuando tienes el contexto fresco de qué hace y qué asume.
+
+¿Quieres que te ayude a definir la plantilla exacta de docstring (Google vs NumPy style) para que la uses consistente en todo `core`?
+
+
+
+
+
+testing:
+
+debera corroborarse al final qeu no quede ningun print 
+
+se deben testear las funcione sy comandos expuestos 
+
+documentacion de estas funciones y comandos

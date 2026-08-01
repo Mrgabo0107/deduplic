@@ -3,7 +3,7 @@ import logging
 import warnings
 from pathlib import Path
 from typing import Any
-from ..exceptions import CorruptDataWarning, DedupAdapterError
+from ..exceptions import CorruptDataWarning, DedupAdapterError, DeduplicFileNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ def _handle_path_or_str(raw_input: Any) -> list[dict]:
     path = Path(raw_input).resolve()
 
     if not path.exists():
-        raise FileNotFoundError(f"The file '{path}' does not exist.")
+        raise DeduplicFileNotFoundError(f"The file '{path}' does not exist.")
 
     logger.debug(f"Loading input file from path: {path}")
 
@@ -26,7 +26,7 @@ def _handle_path_or_str(raw_input: Any) -> list[dict]:
                 f"File '{path}' is not a valid JSON. Details: {e}"
             ) from e
 
-    return normalize_input(content)
+    return deduplic_normalize_input(content)
 
 
 def _handle_indexed_dict(raw_input: dict) -> list[dict]:
@@ -59,7 +59,7 @@ def _handle_list(raw_input: list) -> list[dict]:
     for item in raw_input:
         try:
             # Traverse recursively until the deepest valid structure is reached
-            res = normalize_input(item)
+            res = deduplic_normalize_input(item)
 
             # Ensure that everything returned from recursion consists only of dictionaries
             if all(isinstance(x, dict) for x in res):
@@ -100,7 +100,7 @@ FORMAT_STRATEGIES = [
 
 # MAIN PUBLIC ENTRY POINT
 
-def normalize_input(raw_input: Any) -> list[dict]:
+def deduplic_normalize_input(raw_input: Any) -> list[dict]:
     """
     Library entry point for input normalization.
 
@@ -113,9 +113,6 @@ def normalize_input(raw_input: Any) -> list[dict]:
     Returns:
         list[dict]: A clean, normalized list of record dictionaries.
 
-    Raises:
-        DedupAdapterError: If the input data format is unsupported or invalid.
-        FileNotFoundError: If a provided path does not exist.
     """
 
     for condition, handler in FORMAT_STRATEGIES:

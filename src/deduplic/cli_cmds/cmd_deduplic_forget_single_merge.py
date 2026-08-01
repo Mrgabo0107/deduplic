@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from deduplic.core.merge_manager import forget_merges
+from deduplic.core.methods.merge import forget_merges
 
 PROJECTS_DIR = Path(__file__).resolve().parents[2] / "projects"
 

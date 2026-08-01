@@ -158,3 +158,77 @@ debera corroborarse al final qeu no quede ningun print
 se deben testear las funcione sy comandos expuestos 
 
 documentacion de estas funciones y comandos
+
+
+forget single merge es equivalente a keep all desues de haberlo creado? no deberia solo deberia ignorar el merge pero dehjr la conexion activa
+
+
+
+
+
+a la sfunciones peligrosas que tienen comando asignarles un -y pensaod si faltan funcione spligrosas por anadir o ignorar
+
+test de correr la gui sin instalar streamlit y diff
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tu pyproject.toml ya quedó bien — los 17 entry points con el prefijo deduplic. están correctos ahora. Ese bloqueador está resuelto.
+
+Sobre tu pregunta: Python no da ningún mensaje amigable por defecto. Si alguien instala solo con pip install deduplic (sin [gui]) y ejecuta deduplic_gui, lo que va a ver es un traceback crudo tipo:
+
+Traceback (most recent call last):
+  File "/home/user/.venv/bin/deduplic_gui", line 8, in <module>
+    sys.exit(run_gui())
+  File ".../deduplic/cli_cmds/cmd_deduplic_launch_gui.py", line 3, in run_gui
+    import streamlit as st
+ModuleNotFoundError: No module named 'streamlit'
+
+Esto es técnicamente correcto (el programa falla porque falta la dependencia), pero es una pésima experiencia — el usuario no tiene idea de que existe un extra [gui] a menos que lea tu documentación primero. Python no resuelve esto automáticamente; tienes que capturar el ImportError tú mismo y traducirlo a un mensaje accionable, exactamente el patrón que discutimos hace varios mensajes.
+
+Así se ve implementado en cmd_deduplic_launch_gui.py:
+
+python
+"""Entry point for launching the Streamlit GUI."""
+
+import sys
+
+
+def run_gui() -> None:
+    """Launches the Streamlit-based graphical interface.
+
+    Requires the 'gui' extra to be installed. Prints an actionable message
+    and exits with a non-zero status if streamlit is unavailable.
+    """
+    try:
+        import streamlit  # noqa: F401 (import solo para verificar disponibilidad)
+    except ImportError:
+        print(
+            "Error: la interfaz gráfica requiere dependencias adicionales.\n"
+            "Instálalas con:\n\n"
+            "    pip install deduplic[gui]\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # A partir de aquí streamlit ya está disponible; lanza la app real
+    from deduplic.streamlit_gui.app import main as streamlit_main
+    streamlit_main()
+
+Puntos clave de por qué se hace así:
+
+El import streamlit va dentro de la función, no al inicio del módulo — así, el archivo cmd_deduplic_launch_gui.py se puede importar sin problema (por ejemplo, si algo más adelante hiciera from deduplic.cli_cmds import cmd_deduplic_launch_gui con otro propósito) incluso sin streamlit instalado. El costo de la dependencia solo se paga cuando alguien de verdad ejecuta run_gui().
+sys.exit(1) — código de salida distinto de cero, correcto para un fallo de CLI (permite que scripts que llamen a tu comando detecten el error mediante $? o subprocess.returncode).
+El mensaje va a stderr, no a stdout — convención estándar para errores en herramientas de consola, para que no se mezcle con salida "normal" del programa si alguien redirige la salida (deduplic_gui > log.txt).
+Nota el from deduplic.streamlit_gui.app import main después del chequeo — así, si por algún motivo la importación real de tu módulo de GUI (no solo streamlit) falla por otra razón, ese error sí se ve tal cual, sin que tu mensaje genérico lo enmascare.
+
+Con este patrón: quien instale la librería completa (pip install deduplic[gui]) no nota ninguna diferencia; quien instale solo el core y por error/curiosidad ejecute deduplic_gui, recibe instrucción clara de qué hacer, en vez de un traceback que no dice nada sobre extras opcionales.

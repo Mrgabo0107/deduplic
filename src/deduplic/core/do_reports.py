@@ -167,7 +167,7 @@ def _build_component_reports(total: csr_matrix, by_key: dict, cos: dict) -> list
     return reports
 
 
-def do_reports(
+def deduplic_do_reports(
     data: list[dict], keys_to_check: list[str], threshold: float | None = None
 ) -> list[dict]:
     """

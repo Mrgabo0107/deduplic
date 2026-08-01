@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from .utils import (
     clean_record,
@@ -61,8 +61,13 @@ def _extract_timestamp(record: dict[str, Any]) -> float | None:
     return None
 
 
-def keep_newest(corpus: dict, report: list, target_info: dict) -> tuple[dict, list]:
-    """Applies Keep-Newest strategy based on extracted timestamps."""
+def _keep_by_time_base(
+    corpus: dict,
+    report: list,
+    target_info: dict,
+    mode: Literal["newest", "oldest"],
+) -> tuple[dict, list]:
+    """Base helper function that handles timestamp extraction, comparison, and graph update."""
     cluster_idx = target_info["cluster_idx"]
     edge_idx = target_info["edge_idx"]
     threshold = load_threshold_from_project(target_info.get("project_path"))
@@ -86,8 +91,10 @@ def keep_newest(corpus: dict, report: list, target_info: dict) -> tuple[dict, li
     ts_a = _extract_timestamp(rec_a)
     ts_b = _extract_timestamp(rec_b)
 
+    # Lógica unificada de comparación según el modo
     if ts_a is not None and ts_b is not None:
-        winner_rec = rec_a if ts_a >= ts_b else rec_b
+        is_winner = (ts_a >= ts_b) if mode == "newest" else (ts_a <= ts_b)
+        winner_rec = rec_a if is_winner else rec_b
     elif ts_a is not None:
         winner_rec = rec_a
     elif ts_b is not None:
@@ -95,6 +102,7 @@ def keep_newest(corpus: dict, report: list, target_info: dict) -> tuple[dict, li
     else:
         winner_rec = rec_a
 
+    # Reestructuración común del corpus y gráfico
     synthetic_record = clean_record(winner_rec)
     synthetic_record["_status"] = "active"
     synthetic_record["_merged_from"] = [int(node_a_id), int(node_b_id)]
@@ -115,59 +123,13 @@ def keep_newest(corpus: dict, report: list, target_info: dict) -> tuple[dict, li
 
     update_cluster_structure(cluster, untouched_edges + new_edges_for_c)
     return corpus, report
+
+
+def keep_newest(corpus: dict, report: list, target_info: dict) -> tuple[dict, list]:
+    """Applies Keep-Newest strategy based on extracted timestamps."""
+    return _keep_by_time_base(corpus, report, target_info, mode="newest")
 
 
 def keep_oldest(corpus: dict, report: list, target_info: dict) -> tuple[dict, list]:
     """Applies Keep-Oldest strategy based on extracted timestamps."""
-    cluster_idx = target_info["cluster_idx"]
-    edge_idx = target_info["edge_idx"]
-    threshold = load_threshold_from_project(target_info.get("project_path"))
-
-    cluster = report[cluster_idx]
-    edges = cluster.get("edges_trazability", [])
-
-    if not (0 <= edge_idx < len(edges)):
-        return corpus, report
-
-    target_edge = edges[edge_idx]
-    pair = target_edge.get("pair", [])
-    if len(pair) < 2 or pair[0] == pair[1]:
-        return corpus, report
-
-    node_a_id, node_b_id = pair[0], pair[1]
-    str_a, str_b = str(node_a_id), str(node_b_id)
-
-    rec_a, rec_b = corpus.get(str_a, {}), corpus.get(str_b, {})
-
-    ts_a = _extract_timestamp(rec_a)
-    ts_b = _extract_timestamp(rec_b)
-
-    if ts_a is not None and ts_b is not None:
-        winner_rec = rec_a if ts_a <= ts_b else rec_b
-    elif ts_a is not None:
-        winner_rec = rec_a
-    elif ts_b is not None:
-        winner_rec = rec_b
-    else:
-        winner_rec = rec_a
-
-    synthetic_record = clean_record(winner_rec)
-    synthetic_record["_status"] = "active"
-    synthetic_record["_merged_from"] = [int(node_a_id), int(node_b_id)]
-
-    str_c = get_next_corpus_id(corpus)
-    int_c = int(str_c)
-    corpus[str_c] = synthetic_record
-
-    deprecate_source_records(corpus, str_a, str_b, str_c)
-
-    details = target_edge.get("details", {})
-    keys_for_similarity = list(details.keys()) if details else [k for k in rec_a.keys() if not k.startswith("_")]
-
-    neighbor_ids, untouched_edges = collect_neighbors_and_untouched_edges(edges, node_a_id, node_b_id)
-    new_edges_for_c = recompute_edges_for_synthetic_node(
-        corpus, synthetic_record, int_c, neighbor_ids, keys_for_similarity, threshold
-    )
-
-    update_cluster_structure(cluster, untouched_edges + new_edges_for_c)
-    return corpus, report
+    return _keep_by_time_base(corpus, report, target_info, mode="oldest")

@@ -11,7 +11,7 @@ from deduplic.core.deduplic import (
     deduplic_restore,
     deduplic_delete_project
 )
-from deduplic.core.merge_manager import (
+from deduplic.core.methods.merge import (
     deduplic_has_pending_merges,
     deduplic_forget_merges,
     deduplic_execute_merge,

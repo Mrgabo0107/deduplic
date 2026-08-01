@@ -1,7 +1,7 @@
 import argparse
 import json
 from pathlib import Path
-from deduplic.core.merge_manager import deduplic_list_pending_merges
+from deduplic.core.methods.merge import deduplic_list_pending_merges
 
 PROJECTS_DIR = Path(__file__).resolve().parents[2] / "projects"
 

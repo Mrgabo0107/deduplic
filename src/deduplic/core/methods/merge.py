@@ -1,11 +1,13 @@
+"""Management module for Human-in-the-loop pending merge drafts and execution."""
+
 import json
 import logging
 import shutil
 from pathlib import Path
 
-from ..exceptions import DeduplicError
-from .draft_io import load_draft, save_draft
-from .methods.utils import (
+from ...exceptions import DeduplicError
+from ..draft_io import load_draft, save_draft
+from .utils import (
     collect_neighbors_and_untouched_edges,
     deprecate_source_records,
     get_next_corpus_id,
@@ -19,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_active_node(corpus: dict, node_id: int | str) -> str | int:
-    """
-    Sigue la cadena de redirecciones (_status == 'deprecated', _merged_into) 
-    hasta encontrar el ID activo definitivo dentro del corpus.
-    """
+    """Follows redirection chains (_status == 'deprecated', _merged_into) to active node ID."""
     curr = str(node_id)
     visited = set()
 
@@ -38,21 +37,20 @@ def _resolve_active_node(corpus: dict, node_id: int | str) -> str | int:
 
 
 def _get_merges_dir(project_path: Path | str) -> Path:
+    """Returns path to project merges/ folder, creating it if missing."""
     merges_dir = Path(project_path) / "merges"
     merges_dir.mkdir(parents=True, exist_ok=True)
     return merges_dir
 
 
 def _merge_filename(component_id: int | str, node_a_id: int, node_b_id: int) -> str:
+    """Constructs normalized filename string for a merge draft."""
     lo, hi = sorted((int(node_a_id), int(node_b_id)))
     return f"{component_id}_{lo}_{hi}.json"
 
 
 def _build_merge_preview(corpus: dict, report: list, cluster_idx: int, edge_idx: int) -> dict:
-    """
-    Construye la estructura preview para un merge interactivo.
-    Resuelve aliases activos e incluye el component_id.
-    """
+    """Generates preview payload dictionary for an interactive human merge."""
     if not (0 <= cluster_idx < len(report)):
         raise DeduplicError(f"Cluster index {cluster_idx} out of range.")
 
@@ -104,7 +102,7 @@ def _apply_merge_decision(
     merge_data: dict,
     project_path: Path | str | None = None,
 ) -> tuple[dict, list]:
-    """Aplica la decisión humana validada sobre el corpus y el report."""
+    """Applies structured field selections to build synthetic node and update graph."""
     cluster_idx = merge_data["cluster_idx"]
     node_a_id = merge_data["node_a_id"]
     node_b_id = merge_data["node_b_id"]
@@ -163,12 +161,8 @@ def _apply_merge_decision(
     return corpus, report
 
 
-# ---------------------------------------------------------------------------
-# GESTIÓN DE ARCHIVOS Y ESTADOS (.JSON EN MERGES/)
-# ---------------------------------------------------------------------------
-
-
 def _is_decision_complete(fields: dict) -> bool:
+    """Verifies if at least one field is kept and every kept field has source or edit value."""
     has_keep = False
     for _, rule in fields.items():
         if rule.get("keep"):
@@ -179,6 +173,7 @@ def _is_decision_complete(fields: dict) -> bool:
 
 
 def _compute_status(merge_data: dict, corpus: dict) -> str:
+    """Calculates status string ('obsolete', 'stale', 'ready', 'draft') for a merge record."""
     final_a = _resolve_active_node(corpus, merge_data["node_a_id"])
     final_b = _resolve_active_node(corpus, merge_data["node_b_id"])
 
@@ -195,6 +190,16 @@ def _compute_status(merge_data: dict, corpus: dict) -> str:
 
 
 def create_pending_merge(project_path: Path | str, cluster_idx: int, edge_idx: int) -> Path | None:
+    """Creates a JSON draft file under `merges/` for interactive human resolution.
+
+    Args:
+        project_path: Path to project directory.
+        cluster_idx: Cluster index within draft report.
+        edge_idx: Edge index within cluster traceability list.
+
+    Returns:
+        Path to the created merge JSON file, or None if preview resolves to self-merge.
+    """
     project_path = Path(project_path)
     corpus, report = load_draft(project_path)
 
@@ -219,13 +224,56 @@ def create_pending_merge(project_path: Path | str, cluster_idx: int, edge_idx: i
     return file_path
 
 
+def refresh_cluster_merges(project_path: Path | str, component_id: int | str) -> None:
+    """Scans and updates or removes stale/obsolete merge drafts for a specific cluster.
+
+    Args:
+        project_path: Target project directory.
+        component_id: ID of cluster component to re-verify.
+    """
+    project_path = Path(project_path)
+    merges_dir = project_path / "merges"
+
+    if not merges_dir.exists():
+        return
+
+    cluster_files = list(merges_dir.glob(f"{component_id}_*.json"))
+
+    for file_path in cluster_files:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                merge_data = json.load(f)
+
+            node_a = merge_data.get("node_a_id")
+            node_b = merge_data.get("node_b_id")
+            comp = merge_data.get("component_id", component_id)
+
+            if node_a is not None and node_b is not None:
+                deduplic_execute_merge(project_path, node_a, node_b, comp)
+        except DeduplicError as e:
+            logger.warning(f"Error refreshing {file_path.name}: {e}")
+
+
 def deduplic_execute_merge(
     project_path: Path | str,
     node_a_id: int,
     node_b_id: int,
     component_id: int | str = "cluster",
 ) -> str:
-    """Applies a merge if its status is 'ready', or repairs/discards it if obsolete/stale."""
+    """Executes or updates state of a pending merge draft between two records.
+
+    Args:
+        project_path: Path to project folder.
+        node_a_id: ID of first target record node.
+        node_b_id: ID of second target record node.
+        component_id: Component identifier assigned to cluster.
+
+    Returns:
+        Status result string: 'applied', 'discarded', 'needs_review', or 'not_ready'.
+
+    Raises:
+        DeduplicError: If merge JSON draft file is not found.
+    """
     project_path = Path(project_path)
 
     def _find_edge_idx_for_pair(report, cluster_idx, target_a, target_b):
@@ -316,32 +364,15 @@ def deduplic_execute_merge(
     return "applied"
 
 
-def refresh_cluster_merges(project_path: Path | str, component_id: int | str) -> None:
-    """Scans and updates or removes stale/obsolete merge drafts for a specific cluster."""
-    project_path = Path(project_path)
-    merges_dir = project_path / "merges"
-
-    if not merges_dir.exists():
-        return
-
-    cluster_files = list(merges_dir.glob(f"{component_id}_*.json"))
-
-    for file_path in cluster_files:
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                merge_data = json.load(f)
-            
-            node_a = merge_data.get("node_a_id")
-            node_b = merge_data.get("node_b_id")
-            comp = merge_data.get("component_id", component_id)
-
-            if node_a is not None and node_b is not None:
-                deduplic_execute_merge(project_path, node_a, node_b, comp)
-        except Exception as e:
-            logger.warning(f"Error refreshing {file_path.name}: {e}")
-
-
 def deduplic_list_pending_merges(project_path: Path | str) -> list[dict]:
+    """Scans and lists all pending JSON merge structures for a project.
+
+    Args:
+        project_path: Target project directory.
+
+    Returns:
+        List of dictionaries containing merge preview data updated with `_status` fields.
+    """
     project_path = Path(project_path)
     corpus, _ = load_draft(project_path)
 
@@ -364,11 +395,28 @@ def deduplic_list_pending_merges(project_path: Path | str) -> list[dict]:
 
 
 def deduplic_has_pending_merges(project_path: Path | str) -> bool:
+    """Checks whether a project has any merge draft files pending resolution.
+
+    Args:
+        project_path: Target project directory.
+
+    Returns:
+        True if at least one `.json` file exists inside `merges/`, False otherwise.
+    """
     merges_dir = Path(project_path) / "merges"
     return merges_dir.exists() and any(merges_dir.glob("*.json"))
 
 
 def deduplic_forget_single_merge(project_path: Path | str, filename: str) -> bool:
+    """Deletes a single pending merge draft file from `merges/`.
+
+    Args:
+        project_path: Target project directory.
+        filename: Base filename of the target JSON merge file.
+
+    Returns:
+        True if the file existed and was removed, False otherwise.
+    """
     file_path = Path(project_path) / "merges" / filename
     if file_path.exists():
         file_path.unlink()
@@ -378,6 +426,15 @@ def deduplic_forget_single_merge(project_path: Path | str, filename: str) -> boo
 
 
 def deduplic_forget_merges(project_path: Path | str, confirm: bool = False) -> None:
+    """Deletes the entire `merges/` directory for a project.
+
+    Args:
+        project_path: Target project directory.
+        confirm: Confirmation flag. Must be set to True to execute deletion.
+
+    Raises:
+        DeduplicError: If confirm is False.
+    """
     if not confirm:
         raise DeduplicError("forget_merges requires confirm=True.")
 

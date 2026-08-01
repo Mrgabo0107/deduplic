@@ -6,6 +6,15 @@ from .keep_last import keep_last
 from .keep_shortest import keep_shortest
 from .keep_by_time import keep_newest, keep_oldest
 from .utils import clean_record
+from .merge import (
+    create_pending_merge,
+    refresh_cluster_merges,
+    deduplic_execute_merge,
+    deduplic_list_pending_merges,
+    deduplic_has_pending_merges,
+    deduplic_forget_single_merge,
+    deduplic_forget_merges,
+)
 
 METHODS_REGISTRY = {
     "keep_all": keep_all,

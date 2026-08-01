@@ -2,8 +2,9 @@
 
 # Core Operations
 from .core import (
-    normalize_input,
-    do_reports,
+    refresh_cluster_merges,
+    deduplic_normalize_input,
+    deduplic_do_reports,
     deduplic_init,
     deduplic_init_from_file,
     deduplic_connection,
@@ -16,24 +17,22 @@ from .core import (
     deduplic_get_projects_info,
     deduplic_delete_project,
     deduplic_delete_all,
-)
-
-# Merge Management (Human-in-the-loop)
-from deduplic.core.merge_manager import (
     deduplic_execute_merge,
     deduplic_list_pending_merges,
     deduplic_has_pending_merges,
     deduplic_forget_single_merge,
     deduplic_forget_merges,
+    deduplic_purge_workspace,
+    deduplic_set_workspace_dir,
 )
 
 # Exceptions
-from deduplic.exceptions import DeduplicError
+from .exceptions import DeduplicError
 
 
 __all__ = [
-    "normalize_input",
-    "do_reports",
+    "deduplic_normalize_input",
+    "deduplic_do_reports",
     "deduplic_init",
     "deduplic_init_from_file",
     "deduplic_connection",
@@ -51,6 +50,8 @@ __all__ = [
     "deduplic_has_pending_merges",
     "deduplic_forget_single_merge",
     "deduplic_forget_merges",
+    "deduplic_purge_workspace",
+    "deduplic_set_workspace_dir",
     "DeduplicError"
 ]
 
@@ -59,8 +60,8 @@ __all__ = [
 
 # # Funcion                               |exp func| Comando |
 # #---------------------------------------|--------|---------|
-# # normalize input                       |   X    |         |done
-# # do reports                            |   X    |         |done
+# # deduplic normalize input              |   X    |         |done
+# # deduplic do reports                   |   X    |         |done
 # # deduplic init                         |   X    |         |done
 # # deduplic init from file               |   X    |    X    |fix command else done
 # # deduplic connection                   |   X    |    X    |fix comm
@@ -78,4 +79,6 @@ __all__ = [
 # # deduplic has pending merges           |   X    |    X    |do cmd
 # # deduplic forget single merge          |   X    |    X    |do cmd
 # # deduplic forget merges                |   X    |    X    |fix comm
+# # deduplic_set_workspace_dir            |   X    |    X    |do cm
+# # deduplic_purge_workspace              |   X    |    X    |do cmmd
 # # deduplic_launch_gui                   |        |    X    | fix adjusting to pass path as parameter

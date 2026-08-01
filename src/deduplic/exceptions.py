@@ -6,9 +6,7 @@ used across all layers of the library.
 """
 
 
-# =====================================================================
-# 1. BASE CLASSES (Raíz de la jerarquía)
-# =====================================================================
+# 1. BASE CLASSES
 
 class DeduplicError(Exception):
     """
@@ -31,9 +29,7 @@ class DeduplicWarning(UserWarning):
     pass
 
 
-# =====================================================================
-# 2. SPECIFIC ERRORS (Interrumpen la ejecución con `raise`)
-# =====================================================================
+# 2. SPECIFIC ERRORS
 
 class DedupAdapterError(DeduplicError, ValueError):
     """
@@ -59,17 +55,16 @@ class ClusterSafetyError(DeduplicError, RuntimeError):
     """
     pass
 
+class DeduplicFileNotFoundError(DeduplicError, FileNotFoundError):
+    """Raised when a required project or corpus file does not exist."""
+    pass
 
-class MergeStrategyError(DeduplicError, KeyError):
-    """
-    Raised when an invalid or unknown resolution strategy is requested.
-    """
+class DeduplicIndexError(DeduplicError, IndexError):
+    """Raised when a required project or corpus file does not exist."""
     pass
 
 
-# =====================================================================
-# 3. SPECIFIC WARNINGS (Notifican con `warnings.warn`)
-# =====================================================================
+# 3. SPECIFIC WARNINGS
 
 class CorruptDataWarning(DeduplicWarning):
     """

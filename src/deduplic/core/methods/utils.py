@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ...config import settings
-from ..do_reports import do_reports
+from ..do_reports import deduplic_do_reports
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ def recompute_edges_for_synthetic_node(
         micro_corpus_list.append(clean_record(neighbor_rec))
         index_to_real_id[idx] = neighbor_id
 
-    sub_reports = do_reports(
+    sub_reports = deduplic_do_reports(
         data=micro_corpus_list,
         keys_to_check=keys_to_compare,
         threshold=threshold,

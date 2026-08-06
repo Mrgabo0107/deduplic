@@ -3,7 +3,7 @@ import logging
 import warnings
 from pathlib import Path
 from typing import Any
-from ..exceptions import CorruptDataWarning, DedupAdapterError, DeduplicFileNotFoundError
+from ..exceptions import DeduplicCorruptDataWarning, DedupAdapterError, DeduplicFileNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def _handle_indexed_dict(raw_input: dict) -> list[dict]:
                 f"Expected dict, got {type(val)}."
             )
             logger.warning(msg)
-            warnings.warn(msg, CorruptDataWarning)
+            warnings.warn(msg, DeduplicCorruptDataWarning)
 
     return normalized
 
@@ -67,14 +67,14 @@ def _handle_list(raw_input: list) -> list[dict]:
             else:
                 msg = f"Skipping element because it resolved to non-dictionary data: {item}"
                 logger.warning(msg)
-                warnings.warn(msg, CorruptDataWarning)
+                warnings.warn(msg, DeduplicCorruptDataWarning)
 
         except Exception as e:
             # If any nested layer fails (e.g. missing file, invalid JSON),
             # catch the exception, log it, and continue processing
             msg = f"Skipping corrupt element. Reason: {e}"
             logger.warning(msg)
-            warnings.warn(msg, CorruptDataWarning)
+            warnings.warn(msg, DeduplicCorruptDataWarning)
 
     return normalized
 

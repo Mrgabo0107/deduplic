@@ -2,8 +2,7 @@
 Deduplic Global Configuration Module.
 Location: src/deduplic/config.py
 
-This file defines the project's neutral configuration layer and MUST NOT import
-any internal project modules.
+This file defines the project's neutral configuration layer.
 """
 
 from dataclasses import dataclass, field

@@ -27,7 +27,16 @@ from .core import (
 )
 
 # Exceptions
-from .exceptions import DeduplicError
+from .exceptions import (
+    DeduplicError,
+    DeduplicWarning,
+    DedupAdapterError,
+    DeduplicConfigError,
+    DeduplicClusterSafetyError,
+    DeduplicFileNotFoundError,
+    DeduplicIndexError,
+    DeduplicCorruptDataWarning,
+)
 
 
 __all__ = [
@@ -52,7 +61,14 @@ __all__ = [
     "deduplic_forget_merges",
     "deduplic_purge_workspace",
     "deduplic_set_workspace_dir",
-    "DeduplicError"
+    "DeduplicError",
+    "DeduplicWarning",
+    "DedupAdapterError",
+    "DeduplicConfigError",
+    "DeduplicClusterSafetyError",
+    "DeduplicFileNotFoundError",
+    "DeduplicIndexError",
+    "DeduplicCorruptDataWarning",
 ]
 
 
@@ -60,25 +76,31 @@ __all__ = [
 
 # # Funcion                               |exp func| Comando |
 # #---------------------------------------|--------|---------|
-# # deduplic normalize input              |   X    |         |done
-# # deduplic do reports                   |   X    |         |done
-# # deduplic init                         |   X    |         |done
-# # deduplic init from file               |   X    |    X    |fix command else done
-# # deduplic connection                   |   X    |    X    |fix comm
-# # deduplic cluster                      |   X    |    X    |fix com
-# # deduplic cluster by componenet id     |   X    |    X    |fix comm
-# # deduplic all                          |   X    |    X    |fix comm
-# # deduplic_get_state                    |   X    |    X    |fix comm
-# # deduplic_commit                       |   X    |    X    |fix comm
-# # deduplic_restore                      |   X    |    X    |fix comm
-# # deduplic_get_projects_info            |   X    |         |done
-# # deduplic_delete project               |   X    |    X    |do cmmd
-# # deduplic delete all                   |   X    |    X    |do cmmd
-# # deduplic execute merge                |   X    |    X    |fix comm
-# # deduplic list pending merges          |   X    |    X    |fix comm
-# # deduplic has pending merges           |   X    |    X    |do cmd
-# # deduplic forget single merge          |   X    |    X    |do cmd
-# # deduplic forget merges                |   X    |    X    |fix comm
-# # deduplic_set_workspace_dir            |   X    |    X    |do cm
-# # deduplic_purge_workspace              |   X    |    X    |do cmmd
+# # deduplic normalize input              |   X    |         |
+# # deduplic do reports                   |   X    |         |
+# # deduplic init                         |   X    |         |
+# # deduplic_get_projects_info            |   X    |         |
+# # deduplic init from file               |   X    |    O    |
+# # deduplic connection                   |   X    |    O    |
+# # deduplic cluster                      |   X    |    O    |
+# # deduplic cluster by componenet id     |   X    |    O    |
+# # deduplic all                          |   X    |    O    |
+# # deduplic_get_state                    |   X    |    O    |
+# # deduplic_commit                       |   X    |    O    |
+# # deduplic_restore                      |   X    |    O    |
+# # deduplic_delete project               |   X    |    O    |
+# # deduplic delete all                   |   X    |    O    |
+# # deduplic execute merge                |   X    |    O    |
+# # deduplic list pending merges          |   X    |    O    |
+# # deduplic has pending merges           |   X    |    O    |
+# # deduplic forget single merge          |   X    |    O    |
+# # deduplic forget merges                |   X    |    O    |
+# # deduplic_set_workspace_dir            |   X    |    O    |
+# # deduplic_purge_workspace              |   X    |    O    |
+# # deduplic_get_workspace                |        |    O    |
+# # deduplic_set_threshold                |        |    O    |
+# # deduplic_get_threshold                |        |    O    |
+# # deduplic_set_resolution_method        |        |    O    |
+# # deduplic_get_resolution_method        |        |    O    |
+# # deduplic_set_diff_colors              |        |    O    |
 # # deduplic_launch_gui                   |        |    X    | fix adjusting to pass path as parameter

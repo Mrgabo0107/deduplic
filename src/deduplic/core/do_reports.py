@@ -7,7 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ..config import settings
-from ..exceptions import ClusterSafetyError, DeduplicConfigError
+from ..exceptions import DeduplicClusterSafetyError, DeduplicConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def _validate_cluster_safety(
         danger_threshold (int | None): Max allowed nodes in a single cluster. Defaults to settings.
 
     Raises:
-        ClusterSafetyError: If any cluster size exceeds the safety threshold.
+        DeduplicClusterSafetyError: If any cluster size exceeds the safety threshold.
     """
     if danger_threshold is None:
         danger_threshold = settings.default_batch_size
@@ -97,7 +97,7 @@ def _validate_cluster_safety(
                 f"Please review data consistency and look for empty/generic fields before running the pipeline again."
             )
             logger.error(msg)
-            raise ClusterSafetyError(msg)
+            raise DeduplicClusterSafetyError(msg)
 
 
 def _build_component_reports(total: csr_matrix, by_key: dict, cos: dict) -> list[dict]:
@@ -186,7 +186,7 @@ def deduplic_do_reports(
 
     Raises:
         DeduplicConfigError: If the provided threshold is outside the [0.0, 1.0] range.
-        ClusterSafetyError: If a cluster exceeds the memory safety limits.
+        DeduplicClusterSafetyError: If a cluster exceeds the memory safety limits.
     """
     if threshold is None:
         threshold = settings.default_threshold

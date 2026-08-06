@@ -34,24 +34,45 @@ dev = [
 ]
 
 [project.scripts]
-deduplic_init = "deduplic.cli_cmds.cmd_deduplic_init_from_file:main"
-deduplic_connection = "deduplic.cli_cmds.cmd_deduplic_connection:main"
-deduplic_cluster = "deduplic.cli_cmds.cmd_deduplic_cluster:main"
-deduplic_cluster_by_id = "deduplic.cli_cmds.cmd_deduplic_cluster_by_id:main"
-deduplic_all = "deduplic.cli_cmds.cmd_deduplic_all:main"
-deduplic_deduplic_get_state = "deduplic.cli_cmds.cmd_deduplic_get_state:main"
-deduplic_commit = "deduplic.cli_cmds.cmd_deduplic_commit:main"
-deduplic_restore = "deduplic.cli_cmds.cmd_deduplic_restore:main"
-deduplic_delete_project = "deduplic.cli_cmds.cmd_delete_project:main"
-deduplic_delete_all = "deduplic.cli_cmds.cmd_delete_all:main"
-deduplic_exec_merges = "deduplic.cli_cmds.cmd_deduplic_exec_merge:main"
-deduplic_list_pending_merges = "deduplic.cli_cmds.cmd_deduplic_list_pending_merges:main"
-deduplic_has_pending_merges = "deduplic.cli_cmds.cmd_deduplic_has_pending_merges:main"
-deduplic_forget_single_merge = "deduplic.cli_cmds.cmd_deduplic_forget_single_merge:main"
-deduplic_forget_merges = "deduplic.cli_cmds.cmd_deduplic_forget_merges:main"
-deduplic_set_workspace_dir = "deduplic.cli_cmds.cmd_deduplic_set_workspace_dir:main"
-deduplic_purge_workspace = "deduplic.cli_cmds.cmd_deduplic_purge_workspace:main"
-deduplic_gui = "deduplic.cli_cmds.cmd_deduplic_launch_gui:run_gui"
+# workspace
+# Directories management
+deduplic_init = "deduplic.cli_cmds.workspace.cmd_deduplic_init_from_file:main"
+deduplic_delete_all = "deduplic.cli_cmds.workspace.cmd_deduplic_delete_all:main"
+deduplic_delete_project = "deduplic.cli_cmds.workspace.cmd_deduplic_delete_project:main"
+deduplic_purge_workspace = "deduplic.cli_cmds.workspace.cmd_deduplic_purge_workspace:main"
+
+# Config setters
+deduplic_set_workspace_dir = "deduplic.cli_cmds.workspace.cmd_deduplic_set_workspace_dir:main"
+deduplic_set_threshold = "deduplic.cli_cmds.workspace.cmd_deduplic_set_threshold:main"
+deduplic_set_resolution_method = "deduplic.cli_cmds.workspace.cmd_deduplic_set_resolution_method:main"
+deduplic_set_diff_colors = "deduplic.cli_cmds.workspace.cmd_deduplic_set_diff_colors:main"
+
+# Config getters
+deduplic_get_workspace = "deduplic.cli_cmds.workspace.cmd_deduplic_get_workspace:main"
+deduplic_get_threshold = "deduplic.cli_cmds.workspace.cmd_deduplic_get_threshold:main"
+deduplic_get_resolution_method = "deduplic.cli_cmds.workspace.cmd_deduplic_get_resolution_method:main"
+
+# Projects management
+deduplic_get_state = "deduplic.cli_cmds.workspace.cmd_deduplic_get_state:main"
+deduplic_restore = "deduplic.cli_cmds.workspace.cmd_deduplic_restore:main"
+deduplic_commit = "deduplic.cli_cmds.workspace.cmd_deduplic_commit:main"
+
+
+# Solvers
+deduplic_connection = "deduplic.cli_cmds.solvers.cmd_deduplic_connection:main"
+deduplic_cluster = "deduplic.cli_cmds.solvers.cmd_deduplic_cluster:main"
+deduplic_cluster_by_id = "deduplic.cli_cmds.solvers.cmd_deduplic_cluster_by_id:main"
+deduplic_all = "deduplic.cli_cmds.solvers.cmd_deduplic_all:main"
+
+# Merges
+deduplic_has_pending_merges = "deduplic.cli_cmds.merge.cmd_deduplic_has_pending_merges:main"
+deduplic_list_pending_merges = "deduplic.cli_cmds.merge.cmd_deduplic_list_pending_merges:main"
+deduplic_forget_single_merge = "deduplic.cli_cmds.merge.cmd_deduplic_forget_single_merge:main"
+deduplic_forget_merges = "deduplic.cli_cmds.merge.cmd_deduplic_forget_merges:main"
+deduplic_exec_merges = "deduplic.cli_cmds.merge.cmd_deduplic_exec_merge:main"
+
+# Gui
+# deduplic_gui = "deduplic.cli_cmds.cmd_deduplic_launch_gui:run_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

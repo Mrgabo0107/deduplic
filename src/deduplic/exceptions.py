@@ -47,7 +47,7 @@ class DeduplicConfigError(DeduplicError, ValueError):
     pass
 
 
-class ClusterSafetyError(DeduplicError, RuntimeError):
+class DeduplicClusterSafetyError(DeduplicError, RuntimeError):
     """
     Raised when a graph cluster or matrix exceeds safety/memory limits.
     
@@ -66,7 +66,7 @@ class DeduplicIndexError(DeduplicError, IndexError):
 
 # 3. SPECIFIC WARNINGS
 
-class CorruptDataWarning(DeduplicWarning):
+class DeduplicCorruptDataWarning(DeduplicWarning):
     """
     Emitted when corrupt, invalid, or non-conforming entries are skipped
     during data processing without stopping the pipeline.

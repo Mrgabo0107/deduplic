@@ -116,6 +116,158 @@ def _process_cluster(
     return corpus, report
 
 
+def _init_workspace(project_path: Path) -> None:
+    """Internal helper: Seeds root files and initializes `.draft/` workspace directory."""
+    project_path = Path(project_path).resolve()
+    path_original = project_path / "original"
+    path_draft = project_path / ".draft"
+
+    if not path_original.exists():
+        raise DeduplicFileNotFoundError(
+            f"Cannot initialize workspace: '{path_original}' does not exist."
+        )
+
+    path_draft.mkdir(parents=True, exist_ok=True)
+
+    for filename in ["corpus.json", "report.json"]:
+        source_file = path_original / filename
+        if source_file.exists():
+            shutil.copy2(source_file, project_path / filename)
+            shutil.copy2(source_file, path_draft / filename)
+        else:
+            logger.warning(f"File '{filename}' missing in '{path_original}'.")
+
+    logger.info(f"Workspace successfully initialized for '{project_path.name}'.")
+
+
+def deduplic_init(
+    raw_input: Any,
+    keys: list[str],
+    name: str | None = None,
+    threshold: float | None = None,
+    projects_dir: Path | str | None = None,
+) -> Path | None:
+    """Initializes a new deduplication project from raw in-memory data.
+
+    Normalizes data, computes duplicate clusters via blocking graph algorithms,
+    persists records to `original/`, and prepares `.draft/`.
+
+    Args:
+        raw_input: List of dicts, pandas DataFrame, or raw data structure.
+        keys: Fields/columns to check for duplicate similarities.
+        name: Desired project folder name. Auto-increments if None or duplicate.
+        threshold: Similarity match threshold (0.0 to 1.0). Defaults to settings.
+        projects_dir: Root directory for projects. Defaults to settings.projects_dir.
+
+    Returns:
+        Path to the created project directory, or None if no duplicates are found.
+    """
+    threshold = (
+        threshold if threshold is not None else settings.default_threshold
+    )
+    projects_root = Path(
+        projects_dir if projects_dir is not None else settings.projects_dir
+    ).resolve()
+    projects_root.mkdir(parents=True, exist_ok=True)
+
+    normalized_records = deduplic_normalize_input(raw_input)
+
+    report_data = deduplic_do_reports(
+        data=normalized_records,
+        keys_to_check=keys,
+        threshold=threshold,
+    )
+
+    if not report_data:
+        logger.info(
+            f"No duplications found with threshold {threshold}. Project creation aborted."
+        )
+        return None
+
+    if name is None:
+        counter = 1
+        while (projects_root / str(counter)).exists():
+            counter += 1
+        project_name = str(counter)
+    else:
+        if not (projects_root / name).exists():
+            project_name = name
+        else:
+            counter = 2
+            while (projects_root / f"{name}_{counter}").exists():
+                counter += 1
+            project_name = f"{name}_{counter}"
+
+    project_path = projects_root / project_name
+    path_original = project_path / "original"
+    path_original.mkdir(parents=True, exist_ok=True)
+
+    corpus_boite = {str(i): record for i, record in enumerate(normalized_records)}
+
+    corpus_file = path_original / "corpus.json"
+    with open(corpus_file, "w", encoding="utf-8") as f:
+        json.dump(corpus_boite, f, indent=4, ensure_ascii=False)
+
+    report_file = path_original / "report.json"
+    with open(report_file, "w", encoding="utf-8") as f:
+        json.dump(report_data, f, indent=4, ensure_ascii=False)
+
+    metadata = {
+        "threshold": threshold,
+        "keys_checked": keys,
+        "total_records": len(normalized_records),
+        "status": "in_progress",
+    }
+    metadata_file = project_path / "metadata.json"
+    with open(metadata_file, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=4, ensure_ascii=False)
+
+    _init_workspace(project_path)
+
+    logger.info(f"Project directory successfully initialized at: {project_path}")
+    return project_path
+
+
+def deduplic_init_from_file(
+    file_path: Path | str,
+    keys: list[str],
+    name: str | None = None,
+    threshold: float | None = None,
+    projects_dir: Path | str | None = None,
+) -> Path | None:
+    """Initializes a new deduplication project by reading data from a JSON file.
+
+    Args:
+        file_path: Path to input JSON file containing array of records.
+        keys: List of dict keys to analyze for similarities.
+        name: Name for the project folder. Defaults to input file stem if None.
+        threshold: Match threshold value (0.0 to 1.0).
+        projects_dir: Workspace directory. Defaults to settings.projects_dir.
+
+    Returns:
+        Path to the initialized project directory, or None if no duplicates are found.
+
+    Raises:
+        DeduplicFileNotFoundError: If file_path does not exist.
+    """
+    file_path = Path(file_path).resolve()
+    if not file_path.exists():
+        raise DeduplicFileNotFoundError(f"Input file not found: {file_path}")
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        raw_json_data = json.load(f)
+
+    derived_name = name if name is not None else file_path.stem
+
+    return deduplic_init(
+        raw_input=raw_json_data,
+        keys=keys,
+        name=derived_name,
+        threshold=threshold,
+        projects_dir=projects_dir,
+    )
+
+
 def deduplic_connection(
     project_path: Path | str, 
     cluster_idx: int,
@@ -271,6 +423,10 @@ def deduplic_all(
         ) from e
 
     save_draft(project_path, corpus, report)
+    for cluster in report:
+        comp_id = cluster.get("component_id")
+        if comp_id is not None:
+            refresh_cluster_merges(project_path, comp_id)
 
 
 def deduplic_get_state(
@@ -446,7 +602,10 @@ def deduplic_get_projects_info(workspace_path: Path | str | None = None) -> dict
     return projects
 
 
-def deduplic_delete_project(project_path: Path | str) -> None:
+def deduplic_delete_project(
+        project_path: Path | str,
+        confirm: bool = False,
+        ) -> None:
     """Deletes an entire project directory from disk.
 
     Args:
@@ -457,6 +616,8 @@ def deduplic_delete_project(project_path: Path | str) -> None:
         DeduplicError: If file deletion fails due to permission or I/O errors.
     """
     project_path = Path(project_path).resolve()
+    if not confirm:
+        raise DeduplicError("deduplic_delete_project requires confirm=True.")
 
     if not project_path.exists() or not project_path.is_dir():
         msg = f"Cannot delete project. Path does not exist or is not a directory: {project_path}"
@@ -472,16 +633,22 @@ def deduplic_delete_project(project_path: Path | str) -> None:
         raise DeduplicError(msg) from e
 
 
-def deduplic_delete_all(workspace_path: Path | str | None = None) -> None:
+def deduplic_delete_all(
+    confirm: bool = False, workspace_path: Path | str | None = None
+) -> None:
     """Deletes all project directories within the workspace and recreates an empty root.
 
     Args:
+        confirm: Confirmation flag. Must be set to True to execute deletion.
         workspace_path: Path to workspace. Defaults to `settings.projects_dir`.
 
     Raises:
+        DeduplicError: If confirm is False or directory removal fails.
         DeduplicFileNotFoundError: If workspace_path does not exist.
-        DeduplicError: If directory removal fails.
     """
+    if not confirm:
+        raise DeduplicError("deduplic_delete_all requires confirm=True.")
+
     target_workspace = Path(
         workspace_path if workspace_path is not None else settings.projects_dir
     ).resolve()
@@ -500,157 +667,6 @@ def deduplic_delete_all(workspace_path: Path | str | None = None) -> None:
         logger.error(msg)
         raise DeduplicError(msg) from e
 
-
-def _init_workspace(project_path: Path) -> None:
-    """Internal helper: Seeds root files and initializes `.draft/` workspace directory."""
-    project_path = Path(project_path).resolve()
-    path_original = project_path / "original"
-    path_draft = project_path / ".draft"
-
-    if not path_original.exists():
-        raise DeduplicFileNotFoundError(
-            f"Cannot initialize workspace: '{path_original}' does not exist."
-        )
-
-    path_draft.mkdir(parents=True, exist_ok=True)
-
-    for filename in ["corpus.json", "report.json"]:
-        source_file = path_original / filename
-        if source_file.exists():
-            shutil.copy2(source_file, project_path / filename)
-            shutil.copy2(source_file, path_draft / filename)
-        else:
-            logger.warning(f"File '{filename}' missing in '{path_original}'.")
-
-    logger.info(f"Workspace successfully initialized for '{project_path.name}'.")
-
-
-def deduplic_init(
-    raw_input: Any,
-    keys: list[str],
-    name: str | None = None,
-    threshold: float | None = None,
-    projects_dir: Path | str | None = None,
-) -> Path | None:
-    """Initializes a new deduplication project from raw in-memory data.
-
-    Normalizes data, computes duplicate clusters via blocking graph algorithms,
-    persists records to `original/`, and prepares `.draft/`.
-
-    Args:
-        raw_input: List of dicts, pandas DataFrame, or raw data structure.
-        keys: Fields/columns to check for duplicate similarities.
-        name: Desired project folder name. Auto-increments if None or duplicate.
-        threshold: Similarity match threshold (0.0 to 1.0). Defaults to settings.
-        projects_dir: Root directory for projects. Defaults to settings.projects_dir.
-
-    Returns:
-        Path to the created project directory, or None if no duplicates are found.
-    """
-    threshold = (
-        threshold if threshold is not None else settings.default_threshold
-    )
-    projects_root = Path(
-        projects_dir if projects_dir is not None else settings.projects_dir
-    ).resolve()
-    projects_root.mkdir(parents=True, exist_ok=True)
-
-    normalized_records = deduplic_normalize_input(raw_input)
-
-    report_data = deduplic_do_reports(
-        data=normalized_records,
-        keys_to_check=keys,
-        threshold=threshold,
-    )
-
-    if not report_data:
-        logger.info(
-            f"No duplications found with threshold {threshold}. Project creation aborted."
-        )
-        return None
-
-    if name is None:
-        counter = 1
-        while (projects_root / str(counter)).exists():
-            counter += 1
-        project_name = str(counter)
-    else:
-        if not (projects_root / name).exists():
-            project_name = name
-        else:
-            counter = 2
-            while (projects_root / f"{name}_{counter}").exists():
-                counter += 1
-            project_name = f"{name}_{counter}"
-
-    project_path = projects_root / project_name
-    path_original = project_path / "original"
-    path_original.mkdir(parents=True, exist_ok=True)
-
-    corpus_boite = {str(i): record for i, record in enumerate(normalized_records)}
-
-    corpus_file = path_original / "corpus.json"
-    with open(corpus_file, "w", encoding="utf-8") as f:
-        json.dump(corpus_boite, f, indent=4, ensure_ascii=False)
-
-    report_file = path_original / "report.json"
-    with open(report_file, "w", encoding="utf-8") as f:
-        json.dump(report_data, f, indent=4, ensure_ascii=False)
-
-    metadata = {
-        "threshold": threshold,
-        "keys_checked": keys,
-        "total_records": len(normalized_records),
-        "status": "in_progress",
-    }
-    metadata_file = project_path / "metadata.json"
-    with open(metadata_file, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=4, ensure_ascii=False)
-
-    _init_workspace(project_path)
-
-    logger.info(f"Project directory successfully initialized at: {project_path}")
-    return project_path
-
-
-def deduplic_init_from_file(
-    file_path: Path | str,
-    keys: list[str],
-    name: str | None = None,
-    threshold: float | None = None,
-    projects_dir: Path | str | None = None,
-) -> Path | None:
-    """Initializes a new deduplication project by reading data from a JSON file.
-
-    Args:
-        file_path: Path to input JSON file containing array of records.
-        keys: List of dict keys to analyze for similarities.
-        name: Name for the project folder. Defaults to input file stem if None.
-        threshold: Match threshold value (0.0 to 1.0).
-        projects_dir: Workspace directory. Defaults to settings.projects_dir.
-
-    Returns:
-        Path to the initialized project directory, or None if no duplicates are found.
-
-    Raises:
-        DeduplicFileNotFoundError: If file_path does not exist.
-    """
-    file_path = Path(file_path).resolve()
-    if not file_path.exists():
-        raise DeduplicFileNotFoundError(f"Input file not found: {file_path}")
-
-    with open(file_path, "r", encoding="utf-8") as f:
-        raw_json_data = json.load(f)
-
-    derived_name = name if name is not None else file_path.stem
-
-    return deduplic_init(
-        raw_input=raw_json_data,
-        keys=keys,
-        name=derived_name,
-        threshold=threshold,
-        projects_dir=projects_dir,
-    )
 
 def deduplic_set_workspace_dir(new_path: Path | str | None = None) -> Path:
     """Sets the global workspace directory where deduplication projects are stored.

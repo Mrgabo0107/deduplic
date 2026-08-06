@@ -5,7 +5,7 @@ import logging
 import shutil
 from pathlib import Path
 
-from ...exceptions import DeduplicError
+from ...exceptions import DeduplicError, DeduplicFileNotFoundError
 from ..draft_io import load_draft, save_draft
 from .utils import (
     collect_neighbors_and_untouched_edges,
@@ -20,21 +20,21 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_active_node(corpus: dict, node_id: int | str) -> str | int:
-    """Follows redirection chains (_status == 'deprecated', _merged_into) to active node ID."""
-    curr = str(node_id)
+def _resolve_active_node(corpus: dict, node_id: int | str) -> str:
+    """Follows redirection chains (_status == 'deprecated', _merged_to) to active node ID."""
+    current = str(node_id)
     visited = set()
 
-    while curr in corpus and curr not in visited:
-        visited.add(curr)
-        rec = corpus[curr]
-        if rec.get("_status") == "deprecated" and rec.get("_merged_into"):
-            curr = str(rec["_merged_into"])
-        else:
+    while current not in visited and corpus.get(current, {}).get("_status") == "deprecated":
+        visited.add(current)
+        next_node = corpus[current].get("_merged_to")
+        
+        if not next_node or str(next_node) == current:
             break
+            
+        current = str(next_node)
 
-    return int(curr) if curr.isdigit() else curr
-
+    return current
 
 def _get_merges_dir(project_path: Path | str) -> Path:
     """Returns path to project merges/ folder, creating it if missing."""
@@ -172,13 +172,26 @@ def _is_decision_complete(fields: dict) -> bool:
     return has_keep
 
 
-def _compute_status(merge_data: dict, corpus: dict) -> str:
+def _compute_status(merge_data: dict, corpus: dict, report: list | None = None) -> str:
     """Calculates status string ('obsolete', 'stale', 'ready', 'draft') for a merge record."""
     final_a = _resolve_active_node(corpus, merge_data["node_a_id"])
     final_b = _resolve_active_node(corpus, merge_data["node_b_id"])
+    logger.debug(f"in _compute_status: {final_a, final_b}")
 
     if final_a == final_b:
         return "obsolete"
+
+    if report is not None:
+        cluster_idx = merge_data.get("cluster_idx")
+        if cluster_idx is not None and 0 <= cluster_idx < len(report):
+            edges = report[cluster_idx].get("edges_trazability", [])
+            target_pair = {int(final_a), int(final_b)}
+            edge_exists = any(
+                len(e.get("pair", [])) == 2 and {int(p) for p in e["pair"]} == target_pair
+                for e in edges
+            )
+            if not edge_exists:
+                return "obsolete"
 
     if str(final_a) != str(merge_data["node_a_id"]) or str(final_b) != str(merge_data["node_b_id"]):
         return "stale"
@@ -243,7 +256,7 @@ def refresh_cluster_merges(project_path: Path | str, component_id: int | str) ->
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 merge_data = json.load(f)
-
+        
             node_a = merge_data.get("node_a_id")
             node_b = merge_data.get("node_b_id")
             comp = merge_data.get("component_id", component_id)
@@ -304,12 +317,12 @@ def deduplic_execute_merge(
                 pass
 
     if not file_path.exists():
-        raise DeduplicError(f"No merge draft exists for nodes {node_a_id} and {node_b_id}.")
+        raise DeduplicFileNotFoundError(f"No merge draft exists for nodes {node_a_id} and {node_b_id}.")
 
     with open(file_path, "r", encoding="utf-8") as f:
         merge_data = json.load(f)
 
-    status = _compute_status(merge_data, corpus)
+    status = _compute_status(merge_data, corpus, report)
 
     if status == "obsolete":
         file_path.unlink(missing_ok=True)
@@ -374,7 +387,7 @@ def deduplic_list_pending_merges(project_path: Path | str) -> list[dict]:
         List of dictionaries containing merge preview data updated with `_status` fields.
     """
     project_path = Path(project_path)
-    corpus, _ = load_draft(project_path)
+    corpus, report = load_draft(project_path)
 
     merges_dir = project_path / "merges"
     if not merges_dir.exists():
@@ -385,7 +398,7 @@ def deduplic_list_pending_merges(project_path: Path | str) -> list[dict]:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            data["_status"] = _compute_status(data, corpus)
+            data["_status"] = _compute_status(data, corpus, report)
             data["_file_name"] = file_path.name
             results.append(data)
         except (OSError, json.JSONDecodeError) as e:

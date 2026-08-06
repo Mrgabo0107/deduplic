@@ -232,3 +232,21 @@ El mensaje va a stderr, no a stdout — convención estándar para errores en he
 Nota el from deduplic.streamlit_gui.app import main después del chequeo — así, si por algún motivo la importación real de tu módulo de GUI (no solo streamlit) falla por otra razón, ese error sí se ve tal cual, sin que tu mensaje genérico lo enmascare.
 
 Con este patrón: quien instale la librería completa (pip install deduplic[gui]) no nota ninguna diferencia; quien instale solo el core y por error/curiosidad ejecute deduplic_gui, recibe instrucción clara de qué hacer, en vez de un traceback que no dice nada sobre extras opcionales.
+
+
+
+
+
+
+
+
+LA DOCUMENTACION SE PEUDE EXTRAER AL FINAL y ahi miraremos si es una beuna documentacion
+si los test son por cli documentar como funcionan
+
+pedir a cluade que compruebe 
+
+testear comando de cambio de colores
+
+arreglar Unexpected Error: empty vocabulary; perhaps the documents only contain stop words cuando se pasan keys que no existen
+
+testear la gestion de merges si estando creados se soluciona un nodo por otro metodo

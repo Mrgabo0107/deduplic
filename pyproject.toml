@@ -72,7 +72,7 @@ deduplic_forget_merges = "deduplic.cli_cmds.merge.cmd_deduplic_forget_merges:mai
 deduplic_exec_merges = "deduplic.cli_cmds.merge.cmd_deduplic_exec_merge:main"
 
 # Gui
-# deduplic_gui = "deduplic.cli_cmds.cmd_deduplic_launch_gui:run_gui"
+deduplic_gui = "deduplic.cli_cmds.guicmd_deduplic_launch_gui:run_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

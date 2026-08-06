@@ -1,33 +1,32 @@
-import difflib
+"""Diff utilities for string comparisons.
 
-# src/streamlit_gui/utils/diff_utils.py
+Location: src/deduplic/streamlit_gui/components/merge_view_src/diff_utils.py
+"""
 
 import difflib
 import html
 
 
 def render_diff_html(base_text: str, compare_text: str) -> str:
-    """Genera un HTML diff destacando adiciones y eliminaciones sin tachar el texto en rojo."""
+    """Genera un HTML diff destacando adiciones y eliminaciones por líneas sin tachar el texto."""
     if not base_text and not compare_text:
         return "<i style='color: #888;'>No content to compare</i>"
 
-    # Tokenizamos/comparamos línea por línea o por palabras según tu implementación
-    matcher = difflib.SequenceMatcher(None, base_text.splitlines(), compare_text.splitlines())
-    
+    base_lines = str(base_text).splitlines() if base_text else []
+    compare_lines = str(compare_text).splitlines() if compare_text else []
+
+    diff = difflib.ndiff(base_lines, compare_lines)
     diff_lines = []
-    
-    # Si la comparación es línea por línea mediante difflib.ndiff:
-    diff = difflib.ndiff(base_text.splitlines(), compare_text.splitlines())
-    
+
     for line in diff:
         escaped_line = html.escape(line[2:])
         if line.startswith("- "):
-            # ROJO SIN TACHAR (background tenue o color de texto rojo destacado)
+            # ROJO SIN TACHAR (eliminaciones / texto base)
             diff_lines.append(
                 f'<div style="background-color: rgba(255, 0, 0, 0.2); color: #ff6b6b; padding: 2px 4px; border-radius: 3px; margin: 1px 0; text-decoration: none !important;">- {escaped_line}</div>'
             )
         elif line.startswith("+ "):
-            # VERDE (Adiciones)
+            # VERDE (adiciones / texto a comparar)
             diff_lines.append(
                 f'<div style="background-color: rgba(0, 255, 0, 0.2); color: #51cf66; padding: 2px 4px; border-radius: 3px; margin: 1px 0;">+ {escaped_line}</div>'
             )

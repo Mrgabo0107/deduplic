@@ -250,3 +250,19 @@ testear comando de cambio de colores
 arreglar Unexpected Error: empty vocabulary; perhaps the documents only contain stop words cuando se pasan keys que no existen
 
 testear la gestion de merges si estando creados se soluciona un nodo por otro metodo
+
+no olvidar documentar:
+
+Jerarquía Estricta:
+
+Si se pasa un path válido, se utiliza ese.
+
+Si no se pasa nada, lee la configuración persistente (get_cli_config()).
+
+Si no hay nada en la configuración, cae en el fallback por defecto (user_data_dir/deduplic/deduplic_data).
+
+discutir protecciones en contra de corrupcion de datos por parte del cliente en clude
+
+sacar los colores del archivo config un cambio de eso deberia vivr en lamsima gui
+
+revisar pageging

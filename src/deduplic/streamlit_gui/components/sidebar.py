@@ -1,30 +1,17 @@
+"""Sidebar Navigation Component for Deduplic Streamlit GUI.
+
+Location: src/deduplic/streamlit_gui/components/sidebar.py
+"""
+
 import json
+from typing import Optional
 import streamlit as st
-from deduplic.streamlit_gui.utils.project_loader import (
-    deduplic_get_projects_info, 
+
+from deduplic.streamlit_gui.services.project_service import (
+    deduplic_get_projects_info,
     create_new_project_from_upload,
-    delete_project_directory
+    delete_project_directory,
 )
-
-
-# def _on_delete_project():
-#     """Callback que se ejecuta antes de renderizar la página para eliminar el proyecto."""
-#     active_proj = st.session_state.get("selected_project_name")
-#     if active_proj:
-#         delete_project_directory(active_proj)
-        
-#         updated_projects = get_projects_info()
-#         remaining_options = list(updated_projects.keys()) if updated_projects else []
-#         next_selected = remaining_options[0] if remaining_options else None
-        
-#         st.session_state["selected_project_name"] = None
-#         st.session_state["sidebar_project_selectbox"] = None
-
-#         report_key = f"report_data_{active_proj}"
-#         if report_key in st.session_state:
-#             del st.session_state[report_key]
-
-#         st.toast(f"Project '{active_proj}' deleted successfully.")
 
 
 def _on_delete_project():
@@ -33,7 +20,7 @@ def _on_delete_project():
     if active_proj:
         # 1. Borrado mediante el servicio delegado al core
         success = delete_project_directory(active_proj)
-        
+
         if success:
             # 2. Limpieza de estado en Streamlit
             st.session_state["selected_project_name"] = None
@@ -48,7 +35,7 @@ def _on_delete_project():
             st.error(f"Failed to delete project '{active_proj}'.")
 
 
-def render_sidebar() -> str | None:
+def render_sidebar() -> Optional[str]:
     """Renders the sidebar with project creation, selection, and deletion."""
     with st.sidebar:
         st.title("Deduplic")

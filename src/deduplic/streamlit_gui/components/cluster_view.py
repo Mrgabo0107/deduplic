@@ -1,43 +1,85 @@
+"""Cluster View & Connection Explorer Component for Deduplic Streamlit GUI.
+
+Location: src/deduplic/streamlit_gui/components/cluster_view.py
+"""
+
+import json
 import streamlit as st
-from deduplic.streamlit_gui.components.workspace_src.corpus_loader import (
-    AVAILABLE_METHODS,
-)
+from deduplic.config import settings
 from deduplic.streamlit_gui.services.dedup_service import (
     resolve_edge_action,
     resolve_cluster_action,
 )
 
+AVAILABLE_METHODS = [
+    "keep_all",
+    "keep_first",
+    "keep_last",
+    "keep_largest",
+    "keep_shortest",
+    "keep_newest",
+    "keep_oldest",
+    "merge",
+]
+
+EXCLUDED_METHODS = ["merge"]
+
+
+@st.cache_data(show_spinner="Updating corpus...")
+def get_cached_corpus(project_name: str, last_modified: float) -> dict:
+    """Carga el corpus y lo mantiene en RAM con caché condicional al mtime."""
+    draft_corpus_path = settings.projects_dir / project_name / ".draft" / "corpus.json"
+    if not draft_corpus_path.exists():
+        draft_corpus_path = settings.projects_dir / project_name / "corpus.json"
+
+    if draft_corpus_path.exists():
+        try:
+            with open(draft_corpus_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return {idx: rec for idx, rec in enumerate(data)}
+                elif isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
+    return {}
+
+
+def get_corpus_mtime(project_name: str) -> float:
+    """Obtiene la fecha de última modificación del archivo de corpus."""
+    draft_path = settings.projects_dir / project_name / ".draft" / "corpus.json"
+    if not draft_path.exists():
+        draft_path = settings.projects_dir / project_name / "corpus.json"
+
+    return draft_path.stat().st_mtime if draft_path.exists() else 0.0
+
 
 def _on_resolve_edge(project_name: str, component_id: int | str, edge_idx: int, method_key: str):
-    """Callback que captura la opción seleccionada directamente desde st.session_state."""
+    """Callback para resolver una conexión específica."""
     method = st.session_state.get(method_key)
 
     resolve_edge_action(
         project_name=project_name,
-        component_id=component_id, # Pass component_id instead of positional index
+        component_id=component_id,
         edge_idx=edge_idx,
         method_name=method,
     )
-    
-    # Mantenemos activo únicamente el cluster actual para que NO se cierre el accordion
+
     st.session_state["active_cluster_id"] = component_id
-    
     st.toast("Connection resolved successfully")
 
 
 def _on_resolve_cluster(project_name: str, component_id: int | str, method_key: str):
-    """Callback para la resolución de cluster completo por ID."""
+    """Callback para resolver un cluster completo."""
     method = st.session_state.get(method_key)
-    
+
     resolve_cluster_action(
         project_name=project_name,
-        component_id=component_id, # Pass component_id instead of positional index
+        component_id=component_id,
         method_name=method,
     )
-    
-    # Mantenemos activo únicamente el cluster actual
+
     st.session_state["active_cluster_id"] = component_id
-    
     st.toast("Cluster resolved successfully")
 
 
@@ -49,7 +91,6 @@ def render_connection_explorer(
     corpus_lookup: dict,
 ):
     """Renderiza el explorador lateral/detallado de conexiones dentro de un cluster."""
-
     if not edges:
         st.info("No connections found for this component.")
         return
@@ -74,9 +115,7 @@ def render_connection_explorer(
             e_end = min(e_page * MAX_EDGES_PER_PAGE, total_edges)
             current_edges = edges[e_start:e_end]
 
-            st.caption(
-                f"connections **{e_start + 1}** to **{e_end}** of **{total_edges}**"
-            )
+            st.caption(f"connections **{e_start + 1}** to **{e_end}** of **{total_edges}**")
         else:
             e_start = 0
             current_edges = edges
@@ -103,25 +142,14 @@ def render_connection_explorer(
         elem_a, elem_b = pair[0], pair[1]
         details = selected_edge.get("details", {})
 
-        data_a = (
-            corpus_lookup.get(elem_a)
-            or corpus_lookup.get(str(elem_a))
-            or {"id": elem_a}
-        )
-        data_b = (
-            corpus_lookup.get(elem_b)
-            or corpus_lookup.get(str(elem_b))
-            or {"id": elem_b}
-        )
+        data_a = corpus_lookup.get(elem_a) or corpus_lookup.get(str(elem_a)) or {"id": elem_a}
+        data_b = corpus_lookup.get(elem_b) or corpus_lookup.get(str(elem_b)) or {"id": elem_b}
 
         st.markdown(f"### `{elem_a}` ↔ `{elem_b}`")
 
         if details:
             st.markdown("**Scores:**")
-            lines = [
-                f"- **{key_name}**: `{score * 100:.1f}%`"
-                for key_name, score in details.items()
-            ]
+            lines = [f"- **{key_name}**: `{score * 100:.1f}%`" for key_name, score in details.items()]
             st.markdown("\n".join(lines))
 
         st.markdown("---")
@@ -139,11 +167,10 @@ def render_connection_explorer(
 
         st.markdown("##### Resolve connection by method:")
         m_col, b_col, _ = st.columns([3, 1, 5])
-
         method_key = f"method_edge_{component_id}_{c_idx}_{e_idx}"
 
         with m_col:
-            conn_method = st.selectbox(
+            st.selectbox(
                 "Method",
                 options=AVAILABLE_METHODS,
                 key=method_key,
@@ -154,7 +181,7 @@ def render_connection_explorer(
                 "Resolve",
                 key=f"btn_edge_{component_id}_{c_idx}_{e_idx}",
                 on_click=_on_resolve_edge,
-                args=(project_name, component_id, e_idx, method_key)
+                args=(project_name, component_id, e_idx, method_key),
             )
 
 
@@ -180,22 +207,17 @@ def render_component_item(
         nodes_str += f" (+{len(nodes) - MAX_NODES_TO_SHOW} more)"
 
     label = f"**[{nodes_str}]** — ({len(edges)} connections)"
-
-    # Se determina si el cluster debe mantenerse desplegado tras la interacción
-    is_expanded = (st.session_state.get("active_cluster_id") == component_id)
+    is_expanded = st.session_state.get("active_cluster_id") == component_id
 
     with st.expander(label, expanded=is_expanded):
-        render_connection_explorer(
-            project_name, component_id, c_idx, edges, corpus_lookup
-        )
+        render_connection_explorer(project_name, component_id, c_idx, edges, corpus_lookup)
         st.markdown("---")
         st.markdown("##### Resolve cluster by method:")
         c1, _, c2 = st.columns([3, 6, 1])
-        
         cluster_method_key = f"method_comp_{component_id}_{c_idx}"
-        
+
         with c1:
-            selected_cluster_method = st.selectbox(
+            st.selectbox(
                 "Method",
                 options=AVAILABLE_METHODS,
                 key=cluster_method_key,
@@ -207,5 +229,5 @@ def render_component_item(
                 key=f"btn_comp_{component_id}_{c_idx}",
                 type="primary",
                 on_click=_on_resolve_cluster,
-                args=(project_name, component_id, cluster_method_key)
+                args=(project_name, component_id, cluster_method_key),
             )

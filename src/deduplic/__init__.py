@@ -1,5 +1,19 @@
 """Deduplic: High-performance record deduplication and entity resolution library."""
 
+
+# Exceptions
+from .exceptions import (
+    DeduplicError,
+    DeduplicWarning,
+    DedupAdapterError,
+    DeduplicConfigError,
+    DeduplicClusterSafetyError,
+    DeduplicFileNotFoundError,
+    DeduplicIndexError,
+    DeduplicCorruptDataWarning,
+)
+
+
 # Core Operations
 from .core import (
     refresh_cluster_merges,
@@ -26,20 +40,16 @@ from .core import (
     deduplic_set_workspace_dir,
 )
 
-# Exceptions
-from .exceptions import (
-    DeduplicError,
-    DeduplicWarning,
-    DedupAdapterError,
-    DeduplicConfigError,
-    DeduplicClusterSafetyError,
-    DeduplicFileNotFoundError,
-    DeduplicIndexError,
-    DeduplicCorruptDataWarning,
-)
-
 
 __all__ = [
+    "DeduplicError",
+    "DeduplicWarning",
+    "DedupAdapterError",
+    "DeduplicConfigError",
+    "DeduplicClusterSafetyError",
+    "DeduplicFileNotFoundError",
+    "DeduplicIndexError",
+    "DeduplicCorruptDataWarning",
     "deduplic_normalize_input",
     "deduplic_do_reports",
     "deduplic_init",
@@ -61,14 +71,6 @@ __all__ = [
     "deduplic_forget_merges",
     "deduplic_purge_workspace",
     "deduplic_set_workspace_dir",
-    "DeduplicError",
-    "DeduplicWarning",
-    "DedupAdapterError",
-    "DeduplicConfigError",
-    "DeduplicClusterSafetyError",
-    "DeduplicFileNotFoundError",
-    "DeduplicIndexError",
-    "DeduplicCorruptDataWarning",
 ]
 
 

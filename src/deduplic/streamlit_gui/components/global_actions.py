@@ -1,34 +1,35 @@
-# src/streamlit_gui/components/workspace_src/project_actions.py
+"""Global project actions toolbar for Deduplic Streamlit GUI.
+
+Location: src/deduplic/streamlit_gui/components/global_actions.py
+"""
 
 import streamlit as st
-from deduplic.streamlit_gui.components.workspace_src.corpus_loader import (
-    AVAILABLE_METHODS,
-    EXCLUDED_METHODS,
-)
 from deduplic.streamlit_gui.services.dedup_service import (
     resolve_all_action,
     commit_project_action,
     restore_project_action,
     get_pending_merges_service,
 )
-from deduplic.streamlit_gui.utils.project_loader import deduplic_get_projects_info
+from deduplic.streamlit_gui.components.cluster_view import (
+    AVAILABLE_METHODS,
+    EXCLUDED_METHODS,
+)
 
 
 def _on_commit_project(project_name: str, total_clusters: int):
     try:
         commit_project_action(project_name, remaining_clusters_count=total_clusters)
-        
-        # Limpiar reportes
+
         st.session_state.pop("active_report", None)
         st.session_state.pop(f"report_data_{project_name}", None)
-        
-        # Asegurar que la barra lateral mantenga seleccionado el proyecto recién comiteado
+
         st.session_state["selected_project_name"] = project_name
         st.session_state["sidebar_project_selectbox"] = project_name
 
         st.toast("Project changes successfully committed!")
     except Exception as e:
         st.error(f"Commit failed: {e}")
+
 
 def _on_restore_project(project_name: str):
     try:
@@ -42,13 +43,11 @@ def _on_restore_project(project_name: str):
 
 def render_project_global_actions(project_name: str, total_clusters: int):
     st.markdown("---")
-    
-    # Check de merges pendientes
+
     pending_merges = get_pending_merges_service(project_name)
     merges_count = len(pending_merges)
     has_merges = merges_count > 0
 
-    # 1. SECCIÓN: ACCIÓN GLOBAL (Deduplicate All)
     if total_clusters > 0:
         st.markdown("##### Solve project by method:")
         col_select, _, col_btn = st.columns([3, 6, 1])
@@ -73,8 +72,6 @@ def render_project_global_actions(project_name: str, total_clusters: int):
                 st.rerun()
 
         st.markdown("---")
-
-    # 2. SECCIÓN: MERGES PENDIENTES & PERSISTENCIA
 
     if has_merges:
         st.warning(

@@ -1,29 +1,40 @@
+"""Workspace Main Canvas Component for Deduplic Streamlit GUI.
+
+Location: src/deduplic/streamlit_gui/components/workspace.py
+"""
+
 import json
+from typing import Optional
 import streamlit as st
-from deduplic.streamlit_gui.utils.project_loader import (
+
+from deduplic.config import settings
+from deduplic.streamlit_gui.services.project_service import (
     load_project_report,
     load_dedup_corpus,
     deduplic_get_projects_info,
-    PROJECTS_DIR
 )
-from deduplic.streamlit_gui.components.workspace_src import (
+
+from deduplic.streamlit_gui.components.cluster_view import (
     get_cached_corpus,
     get_corpus_mtime,
     render_component_item,
-    render_project_global_actions,
 )
-from deduplic.streamlit_gui.components.workspace_src.merge_dialog import render_merge_modal
+
+from deduplic.streamlit_gui.components.global_actions import render_project_global_actions
+
+from deduplic.streamlit_gui.components.merge_view import render_merge_modal
 
 
 def get_active_report(project_name: str):
-    draft_report = PROJECTS_DIR / project_name / ".draft" / "report.json"
+    """Carga el reporte borrador si existe, o el principal en su defecto."""
+    draft_report = settings.projects_dir / project_name / ".draft" / "report.json"
     if draft_report.exists():
         with open(draft_report, "r", encoding="utf-8") as f:
             return json.load(f)
     return load_project_report(project_name)
 
 
-def render_workspace(project_name: str | None):
+def render_workspace(project_name: Optional[str]):
     """Renders the main workspace based on the active project."""
 
     if not project_name:

@@ -27,7 +27,7 @@ def delete_project_directory(project_name: str) -> bool:
     if not project_name:
         return False
     project_path = get_workspace_dir() / project_name
-    return deduplic_delete_project(project_path)
+    return deduplic_delete_project(project_path, True)
 
 
 def deduplic_get_projects_info() -> Dict[str, str]:

@@ -109,5 +109,7 @@ def render_project_global_actions(project_name: str, total_clusters: int):
             type="secondary",
             use_container_width=True,
         ):
+            st.session_state.pop("active_edit_key", None)
             st.session_state["open_merge_dialog"] = True
             st.rerun()
+

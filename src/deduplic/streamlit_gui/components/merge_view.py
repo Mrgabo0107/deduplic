@@ -283,6 +283,7 @@ def render_merge_modal(project_name: str):
 
     if not pending_merges:
         st.info("No pending merges to resolve!")
+        st.session_state.pop("active_edit_key", None)
         if st.button("Close", use_container_width=True):
             st.rerun()
         return

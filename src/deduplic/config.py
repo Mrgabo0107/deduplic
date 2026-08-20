@@ -60,12 +60,7 @@ class Settings:
     default_resolution_method: str = "keep_all"
 
     # 3. Memory and Batch Limits
-    max_recommended_records: int = 10000
     default_batch_size: int = 1000
-
-    # 4. Visual Diff Settings (Merge)
-    diff_color_added: str = "#d4edda"      # Light green
-    diff_color_removed: str = "#f8d7da"    # Light red
 
 
 settings = Settings()

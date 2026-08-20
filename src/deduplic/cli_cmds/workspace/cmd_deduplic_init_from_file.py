@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+from datetime import datetime
 
 from deduplic import (
     DeduplicError,
@@ -8,6 +9,13 @@ from deduplic import (
     deduplic_init_from_file,
 )
 from ..utils import get_cli_settings
+
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 
 def _parser():
@@ -72,13 +80,14 @@ def main():
 
     try:
         get_cli_settings()
-
+        init = datetime.now()
         created_folder = deduplic_init_from_file(
             file_path=args.path_to_corpus,
             keys=args.keys,
             name=args.project_name,
             threshold=args.threshold,
         )
+        end = datetime.now()
 
         if created_folder is None:
             print(
@@ -88,7 +97,7 @@ def main():
             sys.exit(0)
 
         # Print cleanly to stdout to facilitate piping or capture in bash
-        print(f"Deduplic project created: {Path(created_folder).resolve()}")
+        print(f"Deduplic project created: {Path(created_folder).resolve()} in time: {end - init}")
 
     except DeduplicFileNotFoundError as e:
         print(f"Error: Target JSON file was not found -> {e}", file=sys.stderr)

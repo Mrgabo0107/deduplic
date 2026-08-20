@@ -1,5 +1,5 @@
 import logging
-from itertools import combinations
+from collections import defaultdict
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
@@ -7,7 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from ..config import settings
-from ..exceptions import DeduplicClusterSafetyError, DeduplicConfigError
+from ..exceptions import DeduplicConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,14 @@ def _extract_adjacency_by_key(
     """
     Binarizes the similarity matrix into an adjacency graph based on a cosine threshold.
     Ensures both records originally contained the metadata key to eliminate empty-string connections.
+
+    Args:
+        matrix (csr_matrix): Cosine similarity matrix.
+        threshold (float): Mapped cosine threshold value.
+        mask (np.ndarray): Presence mask for the metadata key.
+
+    Returns:
+        csr_matrix: Binarized adjacency matrix representing valid similarity connections.
     """
     threshold_mask = matrix.data >= threshold
 
@@ -61,107 +69,172 @@ def _extract_adjacency_by_key(
     return csr_matrix((final_data, (final_rows, final_cols)), shape=matrix.shape)
 
 
-def _validate_cluster_safety(
-    labels: np.ndarray, danger_threshold: int | None = None
-) -> None:
+def _extract_subcorpus_by_indexes(
+    indexes: list[int] | set[int], full_corpus: list[dict]
+) -> tuple[list[dict], dict[int, int]]:
     """
-    Analyzes the sizes of connected components before deep processing.
+    Extracts a subset of records from the main corpus given a collection of global indexes.
 
     Args:
-        labels (np.ndarray): Array mapping each node to its component ID.
-        danger_threshold (int | None): Max allowed nodes in a single cluster. Defaults to settings.
+        indexes (list[int] | set[int]): Sequence or set of zero-based record indexes to extract.
+        full_corpus (list[dict]): The complete list of normalized dataset records.
 
-    Raises:
-        DeduplicClusterSafetyError: If any cluster size exceeds the safety threshold.
+    Returns:
+        tuple[list[dict], dict[int, int]]:
+            - subcorpus: Filtered list of records corresponding to requested indexes.
+            - local_to_global_map: Dictionary mapping local subcorpus index -> global corpus index.
     """
-    if danger_threshold is None:
-        danger_threshold = settings.default_batch_size
+    sorted_indexes = sorted(set(indexes))
+    subcorpus = []
+    local_to_global_map = {}
 
-    if len(labels) == 0:
-        return
+    for local_idx, global_idx in enumerate(sorted_indexes):
+        if 0 <= global_idx < len(full_corpus):
+            subcorpus.append(full_corpus[global_idx])
+            local_to_global_map[local_idx] = global_idx
 
-    component_sizes = np.bincount(labels)
-
-    if len(component_sizes) > 0:
-        max_cluster_size = component_sizes.max()
-
-        if max_cluster_size > danger_threshold:
-            bad_component_id = component_sizes.argmax()
-            example_node = np.where(labels == bad_component_id)[0][0]
-
-            msg = (
-                f"[SAFETY TRIGGER ACTIVATED] Operation aborted to prevent RAM exhaustion.\n"
-                f"A massive cluster containing {max_cluster_size} interconnected records was detected.\n"
-                f"Record index ({example_node}) or its associated metadata keys are generating too many "
-                f"artificial duplicates.\n"
-                f"Please review data consistency and look for empty/generic fields before running the pipeline again."
-            )
-            logger.error(msg)
-            raise DeduplicClusterSafetyError(msg)
+    return subcorpus, local_to_global_map
 
 
-def _build_component_reports(total: csr_matrix, by_key: dict, cos: dict) -> list[dict]:
+def _process_batch_edges(
+    global_edges: dict[tuple[int, int], dict],
+    local_to_global_map: dict[int, int],
+    data: list[dict],
+    keys_to_check: list[str],
+    threshold: float,
+) -> None:
     """
-    Finds independent connected groups (clusters of duplicates) in the unified graph.
-    Computes node degrees, identifies cluster leaders, and generates a traceability report.
+    Computes sparse similarity matrices for a subcorpus batch, extracts valid edges,
+    maps indexes back to global scope, and updates the global edge registry in-place.
+
+    Args:
+        global_edges (dict[tuple[int, int], dict]): Shared edge accumulator registry.
+        local_to_global_map (dict[int, int]): Mapping from subcorpus index to global index.
+        data (list[dict]): Subcorpus slice containing records to evaluate.
+        keys_to_check (list[str]): List of metadata keys to evaluate for duplicates.
+        threshold (float): Linear similarity threshold (0.0 to 1.0).
     """
-    n_components, labels = connected_components(
-        csgraph=total, directed=False, return_labels=True
+    cos_similarity = {}
+    presence_masks = {}
+
+    for key in keys_to_check:
+        logger.debug(f"Computing TF-IDF similarity for key: '{key}' in batch")
+        matrix, mask = _get_cos_similarity_matrix(data, key)
+        cos_similarity[key] = matrix
+        presence_masks[key] = mask
+
+    adjacency_matrix_by_key = {}
+    target_angle_rad = (1 - threshold) * np.pi / 2
+    cos_threshold = np.cos(target_angle_rad)
+
+    for key, matrix in cos_similarity.items():
+        adjacency_matrix_by_key[key] = _extract_adjacency_by_key(
+            matrix, cos_threshold, presence_masks[key]
+        )
+
+    first_key = keys_to_check[0]
+    total_connectivity_matrix = csr_matrix(
+        adjacency_matrix_by_key[first_key].shape, dtype=int
     )
 
-    _validate_cluster_safety(labels)
+    for adj_matrix in adjacency_matrix_by_key.values():
+        total_connectivity_matrix = total_connectivity_matrix + adj_matrix
+
+    coo = total_connectivity_matrix.tocoo()
+
+    for u_local, v_local, total_conn in zip(coo.row, coo.col, coo.data):
+        if u_local >= v_local or total_conn <= 0:
+            continue
+
+        u_global = local_to_global_map[u_local]
+        v_global = local_to_global_map[v_local]
+        edge_key = (min(u_global, v_global), max(u_global, v_global))
+
+        details = {}
+        for key, adj_matrix in adjacency_matrix_by_key.items():
+            if adj_matrix[u_local, v_local] == 1:
+                raw_cos = cos_similarity[key][u_local, v_local]
+                angle_rad = np.arccos(np.clip(raw_cos, -1.0, 1.0))
+                linear_similarity = 1.0 - (angle_rad / (np.pi / 2))
+                details[key] = float(round(linear_similarity, 4))
+
+        if edge_key not in global_edges:
+            global_edges[edge_key] = {
+                "total_connections": int(total_conn),
+                "details": details,
+            }
+
+
+def _build_component_reports(
+    global_edges: dict[tuple[int, int], dict], total_records: int
+) -> list[dict]:
+    """
+    Finds independent connected groups (clusters of duplicates) from global edges.
+    Computes node degrees, identifies cluster leaders, and generates traceability reports.
+
+    Args:
+        global_edges (dict[tuple[int, int], dict]): Accumulated global edge dictionary.
+        total_records (int): Total number of records in the original dataset.
+
+    Returns:
+        list[dict]: Detailed cluster reports identifying duplicates and traceability.
+    """
+    if not global_edges:
+        return []
+
+    row_indexes = []
+    col_indexes = []
+    for u, v in global_edges.keys():
+        row_indexes.extend([u, v])
+        col_indexes.extend([v, u])
+
+    data_ones = np.ones(len(row_indexes), dtype=int)
+    adj_graph = csr_matrix(
+        (data_ones, (row_indexes, col_indexes)), shape=(total_records, total_records)
+    )
+
+    n_components, labels = connected_components(
+        csgraph=adj_graph, directed=False, return_labels=True
+    )
 
     reports = []
-
     for comp_id in range(n_components):
         nodes = np.where(labels == comp_id)[0]
-
         if len(nodes) <= 1:
             continue
 
-        node_degrees = {}
+        node_set = set(nodes)
+        node_degrees = defaultdict(int)
+        cluster_edges = []
 
-        for node in nodes:
-            total_connections_with_neighbors = total[node].sum() - total[node, node]
-            node_degrees[int(node)] = int(total_connections_with_neighbors)
-
-        sorted_nodes = sorted(
-            node_degrees.items(), key=lambda item: item[1], reverse=True
-        )
-
-        edges_trazability = []
-
-        for node_a, node_b in combinations(nodes, 2):
-            total_connections = total[node_a, node_b]
-
-            if total_connections > 0:
-                details = {}
-
-                for key, adj_matrix in by_key.items():
-                    if adj_matrix[node_a, node_b] == 1:
-                        raw_cos = cos[key][node_a, node_b]
-
-                        angle_rad = np.arccos(np.clip(raw_cos, -1.0, 1.0))
-                        linear_similarity = 1.0 - (angle_rad / (np.pi / 2))
-
-                        details[key] = float(round(linear_similarity, 4))
-
-                edges_trazability.append(
+        for (u, v), edge_info in global_edges.items():
+            if u in node_set and v in node_set:
+                node_degrees[u] += 1
+                node_degrees[v] += 1
+                cluster_edges.append(
                     {
-                        "pair": (int(node_a), int(node_b)),
-                        "total_connections": int(total_connections),
-                        "details": details,
+                        "pair": [int(u), int(v)],
+                        "total_connections": edge_info["total_connections"],
+                        "details": edge_info["details"],
                     }
                 )
 
+        if not cluster_edges:
+            continue
+
+        sorted_nodes = sorted(
+            [(int(node), deg) for node, deg in node_degrees.items()],
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
         component_report = {
             "component_id": int(comp_id),
-            "nodes": [int(n) for n in nodes],
-            "node_degrees": node_degrees,
+            "nodes": [int(n) for n in sorted(nodes)],
+            "node_degrees": {str(node): deg for node, deg in sorted_nodes},
             "leader": sorted_nodes[0][0],
-            "edges_trazability": edges_trazability,
+            "edges_trazability": cluster_edges,
         }
-
         reports.append(component_report)
 
     return reports
@@ -171,10 +244,10 @@ def deduplic_do_reports(
     data: list[dict], keys_to_check: list[str], threshold: float | None = None
 ) -> list[dict]:
     """
-    Orchestrates the report generation pipeline.
+    Orchestrates the report generation pipeline using a memory-safe batch strategy.
 
-    Computes sparse similarities, handles linear-to-angular threshold mapping,
-    builds the unified sparse graph, and returns the list of cluster reports.
+    Computes sparse similarities by partitions, handles linear-to-angular threshold mapping,
+    accumulates global edge connections, and returns the list of cluster reports.
 
     Args:
         data (list[dict]): List of normalized records.
@@ -186,7 +259,6 @@ def deduplic_do_reports(
 
     Raises:
         DeduplicConfigError: If the provided threshold is outside the [0.0, 1.0] range.
-        DeduplicClusterSafetyError: If a cluster exceeds the memory safety limits.
     """
     if threshold is None:
         threshold = settings.default_threshold
@@ -196,47 +268,42 @@ def deduplic_do_reports(
             f"The threshold must be between 0.0 and 1.0, got: {threshold}"
         )
 
+    total_records = len(data)
+    batch_size = settings.default_batch_size
     logger.info(
-        f"Starting report generation for {len(data)} records across keys: {keys_to_check}"
+        f"Starting report generation for {total_records} records across keys: {keys_to_check}"
     )
 
-    cos_similarity = {}
-    presence_masks = {}
+    global_edges = {}
+    blocks = [
+        list(range(i, min(i + batch_size, total_records)))
+        for i in range(0, total_records, batch_size)
+    ]
+    total_blocks = len(blocks)
 
-    # Step 1: Compute sparse similarity matrices and presence masks
-    for key in keys_to_check:
-        logger.debug(f"Computing TF-IDF similarity for key: '{key}'")
-        matrix, mask = _get_cos_similarity_matrix(data, key)
-        cos_similarity[key] = matrix
-        presence_masks[key] = mask
+    logger.debug(f"total blocks: {total_blocks}")
+    for i in range(total_blocks):
+        for j in range(i, total_blocks):
+            logger.debug(f"batching blocks: {i,j}")
+            if i == j and total_blocks > 1:
+                continue
+            if i == j:
+                target_indexes = blocks[i]
+            else:
+                target_indexes = blocks[i] + blocks[j]
 
-    adyacent_matrix_by_key = {}
+            subcorpus, local_to_global_map = _extract_subcorpus_by_indexes(
+                target_indexes, data
+            )
 
-    # Step 2: Threshold mapping (linear to angular space)
-    target_angle_rad = (1 - threshold) * np.pi / 2
-    cos_threshold = np.cos(target_angle_rad)
+            _process_batch_edges(
+                global_edges=global_edges,
+                local_to_global_map=local_to_global_map,
+                data=subcorpus,
+                keys_to_check=keys_to_check,
+                threshold=threshold,
+            )
 
-    # Step 3: Binarize matrices based on mapped threshold
-    for key, matrix in cos_similarity.items():
-        adyacent_matrix_by_key[key] = _extract_adjacency_by_key(
-            matrix, cos_threshold, presence_masks[key]
-        )
-
-    # Step 4: Merge sparse adjacency matrices across all checked keys
-    first_key = keys_to_check[0]
-    total_connectivity_matrix = csr_matrix(
-        adyacent_matrix_by_key[first_key].shape, dtype=int
-    )
-
-    for adj_matrix in adyacent_matrix_by_key.values():
-        total_connectivity_matrix = total_connectivity_matrix + adj_matrix
-
-    # Step 5: Delineate connected components and return cluster reports
-    reports = _build_component_reports(
-        total_connectivity_matrix,
-        adyacent_matrix_by_key,
-        cos_similarity,
-    )
-
+    reports = _build_component_reports(global_edges, total_records)
     logger.info(f"Report generation completed. Found {len(reports)} duplicate clusters.")
     return reports

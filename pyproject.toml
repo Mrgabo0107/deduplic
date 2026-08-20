@@ -30,7 +30,8 @@ gui = [
     "diff-match-patch>=20230505",
 ]
 dev = [
-    "pytest>=7.0"
+    "pytest>=7.0",
+    "matplotlib>=3.5.0"
 ]
 
 [project.scripts]
@@ -46,6 +47,7 @@ deduplic_set_workspace_dir = "deduplic.cli_cmds.workspace.cmd_deduplic_set_works
 deduplic_set_threshold = "deduplic.cli_cmds.workspace.cmd_deduplic_set_threshold:main"
 deduplic_set_resolution_method = "deduplic.cli_cmds.workspace.cmd_deduplic_set_resolution_method:main"
 deduplic_set_diff_colors = "deduplic.cli_cmds.workspace.cmd_deduplic_set_diff_colors:main"
+deduplic_batchsize = "deduplic.cli_cmds.workspace.cmd_deduplic_batchsize:main"
 
 # Config getters
 deduplic_get_workspace = "deduplic.cli_cmds.workspace.cmd_deduplic_get_workspace:main"
@@ -72,7 +74,7 @@ deduplic_forget_merges = "deduplic.cli_cmds.merge.cmd_deduplic_forget_merges:mai
 deduplic_exec_merges = "deduplic.cli_cmds.merge.cmd_deduplic_exec_merge:main"
 
 # Gui
-deduplic_gui = "deduplic.cli_cmds.guicmd_deduplic_launch_gui:run_gui"
+deduplic_gui = "deduplic.cli_cmds.gui.cmd_deduplic_launch_gui:run_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -8,9 +8,9 @@ from typing import Optional
 import streamlit as st
 
 from deduplic.streamlit_gui.services.project_service import (
-    deduplic_get_projects_info,
     create_new_project_from_upload,
     delete_project_directory,
+    deduplic_get_projects_info,
 )
 
 
@@ -40,18 +40,21 @@ def render_sidebar() -> Optional[str]:
     with st.sidebar:
         st.title("Deduplic")
 
+        # -------------------------------------------------------------------
+        # 1. NEW PROJECT CREATION POPOVER
+        # -------------------------------------------------------------------
         with st.popover("New Project", use_container_width=True):
 
             # Garantizar versión única para resetear el file uploader de forma nativa
             if "uploader_version" not in st.session_state:
                 st.session_state["uploader_version"] = 0
 
-            uploader_key = f"sidebar_file_uploader_{st.session_state['uploader_version']}"
+            uploader_key = (
+                f"sidebar_file_uploader_{st.session_state['uploader_version']}"
+            )
 
             uploaded_file = st.file_uploader(
-                "Select a JSON file",
-                type=["json"],
-                key=uploader_key
+                "Select a JSON file", type=["json"], key=uploader_key
             )
 
             if uploaded_file is not None:
@@ -59,36 +62,53 @@ def render_sidebar() -> Optional[str]:
                     raw_bytes = uploaded_file.getvalue()
                     sample_data = json.loads(raw_bytes.decode("utf-8"))
 
-                    sample_rec = sample_data[0] if isinstance(sample_data, list) and len(sample_data) > 0 else {}
-                    detected_keys = [k for k in sample_rec.keys() if not k.startswith("_")]
+                    sample_rec = (
+                        sample_data[0]
+                        if isinstance(sample_data, list) and len(sample_data) > 0
+                        else {}
+                    )
+                    detected_keys = [
+                        k for k in sample_rec.keys() if not k.startswith("_")
+                    ]
 
                     st.caption(f"Detected records: **{len(sample_data)}**")
 
                     custom_keys_str = st.text_input(
                         "Fields to Compare (comma separated)",
-                        value=", ".join(detected_keys[:2]) if detected_keys else "",
-                        placeholder="text, title, author, date"
+                        value=", ".join(detected_keys[:2])
+                        if detected_keys
+                        else "",
+                        placeholder="text, title, author, date",
                     )
-                    selected_keys = [k.strip() for k in custom_keys_str.split(",") if k.strip()]
+                    selected_keys = [
+                        k.strip()
+                        for k in custom_keys_str.split(",")
+                        if k.strip()
+                    ]
 
                     threshold = st.slider(
                         "Similarity Threshold",
                         min_value=0.0,
                         max_value=1.0,
                         value=0.8,
-                        step=0.05
+                        step=0.05,
                     )
 
-                    if st.button("Create Project", type="primary", use_container_width=True):
+                    if st.button(
+                        "Create Project",
+                        type="primary",
+                        use_container_width=True,
+                    ):
                         if not selected_keys:
                             st.error("You must select at least one field.")
                         else:
                             with st.spinner("Analyzing and processing..."):
                                 uploaded_file.seek(0)
-                                created_path, base_name = create_new_project_from_upload(
-                                    uploaded_file,
-                                    selected_keys,
-                                    threshold
+                                (
+                                    created_path,
+                                    base_name,
+                                ) = create_new_project_from_upload(
+                                    uploaded_file, selected_keys, threshold
                                 )
 
                             if created_path is None:
@@ -108,9 +128,13 @@ def render_sidebar() -> Optional[str]:
                                         f"Project '{actual_name}' created successfully.",
                                     )
 
-                                # 1. Seleccionar el nuevo proyecto
-                                st.session_state["selected_project_name"] = actual_name
-                                st.session_state["sidebar_project_selectbox"] = actual_name
+                                # 1. Seleccionar el nuevo proyecto en el Session State
+                                st.session_state["selected_project_name"] = (
+                                    actual_name
+                                )
+                                st.session_state[
+                                    "sidebar_project_selectbox"
+                                ] = actual_name
 
                                 # 2. Incrementar versión del uploader para resetearlo y cerrar el popover
                                 st.session_state["uploader_version"] += 1
@@ -130,7 +154,8 @@ def render_sidebar() -> Optional[str]:
 
         if not projects_info:
             st.caption("No projects found in the 'projects/' directory.")
-            selected_name = None
+            st.session_state["selected_project_name"] = None
+            st.session_state["sidebar_project_selectbox"] = None
         else:
             options = list(projects_info.keys())
 
@@ -141,24 +166,30 @@ def render_sidebar() -> Optional[str]:
                 icon = "🟢" if status == "committed" else "🟡"
                 return f"{icon} {name} ({status})"
 
-            current_selection = st.session_state.get("selected_project_name")
-            current_index = options.index(current_selection) if current_selection in options else None
+            # Si el proyecto guardado en la key del selectbox ya no existe entre las opciones, lo limpiamos
+            if (
+                st.session_state.get("sidebar_project_selectbox")
+                not in options
+            ):
+                st.session_state["sidebar_project_selectbox"] = None
 
             selected_name = st.selectbox(
                 "Select a project:",
                 options=options,
-                index=current_index,
                 placeholder="Choose a project...",
                 format_func=format_label,
-                key="sidebar_project_selectbox"
+                key="sidebar_project_selectbox",
             )
 
+            # Mantenemos sincronizado selected_project_name
             st.session_state["selected_project_name"] = selected_name
 
         # -------------------------------------------------------------------
         # 3. DELETE PROJECT BUTTON
         # -------------------------------------------------------------------
-        has_active_project = bool(st.session_state.get("selected_project_name"))
+        has_active_project = bool(
+            st.session_state.get("selected_project_name")
+        )
 
         st.button(
             "Delete Project",
@@ -166,7 +197,7 @@ def render_sidebar() -> Optional[str]:
             disabled=not has_active_project,
             use_container_width=True,
             key="btn_delete_project",
-            on_click=_on_delete_project
+            on_click=_on_delete_project,
         )
 
         st.markdown("---")
